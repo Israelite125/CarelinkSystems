@@ -179,6 +179,10 @@ if "clinical_notes" not in st.session_state:
 if "shift_logs" not in st.session_state:
     st.session_state.shift_logs = []
 
+# --- TWILIO CONFIGURATION CONSTANTS ---
+TWILIO_SID = "AC734de765447250919ce5675f390cdce2"
+TWILIO_TOKEN = "3a62e0dfeedf90c44defebff884f88ea"
+
 # --- LOCAL AUTH PORTAL WITH RBAC ---
 def login_signup_portal():
     col1, col2, col3 = st.columns([1, 1.5, 1])
@@ -201,7 +205,6 @@ def login_signup_portal():
                     elif email in st.session_state.mock_db and st.session_state.mock_db[email][0] == password:
                         role = st.session_state.mock_db[email][1]
                         st.session_state.user = {"email": email, "role": role}
-                        # Save session to browser URL params to persist across refreshes
                         st.query_params["user_email"] = email
                         st.query_params["user_role"] = role
                         st.success(f"Authenticated as {role}!")
@@ -426,9 +429,7 @@ def main_dashboard():
                                     st.error("Please add a contact phone number first.")
                                 else:
                                     try:
-                                        account_sid = "AC734de765447250919ce5675f390cdce2"
-                                        auth_token = "3a62e0dfeedf90c44defebff884f88ea"
-                                        client = Client(account_sid, auth_token)
+                                        client = Client(TWILIO_SID, TWILIO_TOKEN)
                                         refill_msg = f"REFILL ALERT: Patient {rx['patient']} is running low on {rx['medication']} ({rx['count']} pills left). - CareLink"
                                         client.messages.create(body=refill_msg, from_="whatsapp:+14155238886", to=f"whatsapp:{rx['contact']}")
                                         st.success("WhatsApp refill alert dispatched!")
@@ -540,9 +541,7 @@ def main_dashboard():
                     st.error("Please provide both patient name and phone number.")
                 else:
                     try:
-                        account_sid = "AC734de765447250919ce5675f390cdce2"
-                        auth_token = "3a62e0dfeedf90c44defebff884f88ea"
-                        client = Client(account_sid, auth_token)
+                        client = Client(TWILIO_SID, TWILIO_TOKEN)
                         sender = "whatsapp:+14155238886" if channel == "WhatsApp" else "+15017122661"
                         recipient = f"whatsapp:{phone_number}" if channel == "WhatsApp" else phone_number
                         
@@ -587,9 +586,7 @@ def main_dashboard():
                 st.error("Emergency config incomplete! Please save a patient name and contact number above first.")
             else:
                 try:
-                    account_sid = "AC734de765447250919ce5675f390cdce2"
-                    auth_token = "3a62e0dfeedf90c44defebff884f88ea"
-                    client = Client(account_sid, auth_token)
+                    client = Client(TWILIO_SID, TWILIO_TOKEN)
                     sos_msg = f"🚨 MEDICAL EMERGENCY SOS 🚨: Immediate assistance required for patient {current_patient}. Please respond immediately! - CareLink"
                     message = client.messages.create(body=sos_msg, from_="whatsapp:+14155238886", to=f"whatsapp:{current_contact}")
                     st.success(f"Emergency SOS WhatsApp successfully broadcasted! (SID: {message.sid})")
