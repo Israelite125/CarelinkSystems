@@ -15,6 +15,16 @@ st.set_page_config(
 if "theme_mode" not in st.session_state:
     st.session_state.theme_mode = "Light"
 
+# --- PERSISTENT SESSION RESTORATION VIA QUERY PARAMS ---
+if "user" not in st.session_state:
+    saved_email = st.query_params.get("user_email")
+    saved_role = st.query_params.get("user_role")
+    
+    if saved_email and saved_role:
+        st.session_state.user = {"email": saved_email, "role": saved_role}
+    else:
+        st.session_state.user = None
+
 # --- DYNAMIC THEME CSS INJECTION & FIXES ---
 if st.session_state.theme_mode == "Dark":
     bg_color = "#0f172a"
@@ -31,7 +41,7 @@ else:
     sidebar_bg = "#f1f5f9"
     border_color = "#e2e8f0"
     sub_text = "#64748b"
-    toggle_icon_color = "#0f172a"
+    toggle_icon_color = "#1e293b"
 
 st.markdown(f"""
 <style>
@@ -51,17 +61,23 @@ st.markdown(f"""
         color: {text_color} !important;
     }}
     
-    /* Sidebar Collapse/Expand Toggle Button Box & Arrow Fixes */
-    [data-testid="collapsedControl"], [data-testid="stSidebarCollapseButton"] button, [data-testid="stHeader"] button {{
+    /* Leftmost Sidebar Collapse/Expand Toggle Button Box Fixes */
+    [data-testid="collapsedControl"] {{
         background-color: {card_bg} !important;
         border: 1px solid {border_color} !important;
         border-radius: 8px !important;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        z-index: 999999;
+    }}
+
+    [data-testid="collapsedControl"] button {{
+        background-color: transparent !important;
+        border: none !important;
+        color: {toggle_icon_color} !important;
     }}
 
     [data-testid="collapsedControl"] svg, 
-    [data-testid="stSidebarCollapseButton"] button svg,
-    [data-testid="stHeader"] button svg {{
+    [data-testid="collapsedControl"] svg path {{
         fill: {toggle_icon_color} !important;
         stroke: {toggle_icon_color} !important;
         color: {toggle_icon_color} !important;
@@ -135,9 +151,6 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # --- SESSION STATE INITIALIZATION ---
-if "user" not in st.session_state:
-    st.session_state.user = None
-
 if "mock_db" not in st.session_state:
     st.session_state.mock_db = {
         "admin@carelink.com": ("password123", "Doctor / Admin"),
@@ -188,6 +201,9 @@ def login_signup_portal():
                     elif email in st.session_state.mock_db and st.session_state.mock_db[email][0] == password:
                         role = st.session_state.mock_db[email][1]
                         st.session_state.user = {"email": email, "role": role}
+                        # Save session to browser URL params to persist across refreshes
+                        st.query_params["user_email"] = email
+                        st.query_params["user_role"] = role
                         st.success(f"Authenticated as {role}!")
                         st.rerun()
                     else:
@@ -208,6 +224,8 @@ def login_signup_portal():
                     else:
                         st.session_state.mock_db[new_email] = (new_password, selected_role)
                         st.session_state.user = {"email": new_email, "role": selected_role}
+                        st.query_params["user_email"] = new_email
+                        st.query_params["user_role"] = selected_role
                         st.success(f"Account created as {selected_role}!")
                         st.rerun()
 
@@ -273,6 +291,7 @@ def main_dashboard():
     st.sidebar.markdown("---")
     if st.sidebar.button("Log Out of Session", use_container_width=True):
         st.session_state.user = None
+        st.query_params.clear()
         st.rerun()
         
     # --- DASHBOARD VIEWS ---
