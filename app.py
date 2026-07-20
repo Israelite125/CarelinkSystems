@@ -181,7 +181,7 @@ if "shift_logs" not in st.session_state:
 
 # --- TWILIO CONFIGURATION CONSTANTS ---
 TWILIO_SID = "AC734de765447250919ce5675f390cdce2"
-TWILIO_TOKEN = "3a62e0dfeedf90c44defebff884f88ea"
+TWILIO_TOKEN = "766d8da3ef201c6aa313bd4f52176bc8"
 
 # --- LOCAL AUTH PORTAL WITH RBAC ---
 def login_signup_portal():
