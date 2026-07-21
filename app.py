@@ -18,9 +18,6 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-try:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 except Exception as e:
     supabase = None
 
