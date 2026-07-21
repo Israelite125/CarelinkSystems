@@ -83,7 +83,7 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# --- MOCK DATABASE WITH CONFIGURED PHONE NUMBER ---
+# --- MOCK DATABASE WITH USER PHONE CONFIGURED ---
 if "mock_db" not in st.session_state:
     st.session_state.mock_db = {
         "admin@carelink.com": {"password": "password123", "role": "Doctor / Admin", "phone": "+2347038973019"},
@@ -95,7 +95,7 @@ for k in ["vitals_logs", "schedules", "notifications", "prescriptions", "emergen
     if k not in st.session_state:
         st.session_state[k] = [] if k != "emergency_config" else {"contact": "", "patient": ""}
 
-# --- SECURE AUTHENTICATION PORTAL WITH WHATSAPP MFA ---
+# --- SECURE AUTHENTICATION PORTAL WITH MFA ---
 def login_signup_portal():
     col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
@@ -161,7 +161,6 @@ def login_signup_portal():
                             "phone": user_record["phone"]
                         }
                         
-                        # Dispatched via WhatsApp Sandbox
                         try:
                             client = Client(TWILIO_SID, TWILIO_TOKEN)
                             client.messages.create(
@@ -172,7 +171,6 @@ def login_signup_portal():
                         except Exception as e:
                             pass
                         
-                        # Presentation backup notice ensuring code visibility during reviews
                         st.warning(f"⚠️ Twilio Sandbox International Routing Notice: Trial sandbox restricted delivery. [Presentation Debug OTP Code: **{otp_code}**]")
                         log_security_event("Primary Auth Success", "LOW", f"Credentials verified for {email}. Triggered WhatsApp MFA dispatch.")
                         st.rerun()
