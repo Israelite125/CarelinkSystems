@@ -1,8 +1,8 @@
 import streamlit as st
 import datetime
-import random
 import re
-from twilio.rest import Client
+from supabase import create_client, Client
+from twilio.rest import Client as TwilioClient
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
@@ -11,6 +11,31 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# --- SUPABASE CONFIGURATION (For Native Auth & OTP) ---
+SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL"
+SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY"
+
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    supabase = None
+
+# --- TWILIO CONFIGURATION (For Operational WhatsApp Notifications) ---
+TWILIO_SID = "AC734de765447250919ce5675f390cdce2"
+TWILIO_TOKEN = "3a62e0dfeedf90c44defebff884f88ea"
+
+def send_whatsapp_appointment(patient_phone, message_body):
+    try:
+        client = TwilioClient(TWILIO_SID, TWILIO_TOKEN)
+        client.messages.create(
+            body=f"📅 CareLink Appointment Alert: {message_body}",
+            from_="whatsapp:+14155238886",
+            to=f"whatsapp:{patient_phone}"
+        )
+        return True
+    except Exception as e:
+        return str(e)
 
 # --- THEME STATE INITIALIZATION ---
 if "theme_mode" not in st.session_state:
@@ -30,14 +55,10 @@ if "failed_login_attempts" not in st.session_state:
     st.session_state.failed_login_attempts = 0
 
 if "mfa_state" not in st.session_state:
-    st.session_state.mfa_state = {"pending": False, "email": "", "code": "", "role": "", "phone": ""}
+    st.session_state.mfa_state = {"pending": False, "email": "", "role": "Doctor / Admin"}
 
 if "security_audit_logs" not in st.session_state:
     st.session_state.security_audit_logs = []
-
-# --- TWILIO CREDENTIALS ---
-TWILIO_SID = "AC734de765447250919ce5675f390cdce2"
-TWILIO_TOKEN = "3a62e0dfeedf90c44defebff884f88ea"
 
 # --- IDPS ENGINE: ANOMALY & INJECTION DETECTION ---
 def log_security_event(event_type, severity, description):
@@ -83,119 +104,128 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# --- MOCK DATABASE WITH USER PHONE CONFIGURED ---
-if "mock_db" not in st.session_state:
-    st.session_state.mock_db = {
-        "admin@carelink.com": {"password": "password123", "role": "Doctor / Admin", "phone": "+2347038973019"},
-        "caregiver@carelink.com": {"password": "password123", "role": "Caregiver", "phone": "+2347038973019"},
-        "family@carelink.com": {"password": "password123", "role": "Family / Patient", "phone": "+2347038973019"}
-    }
-
 for k in ["vitals_logs", "schedules", "notifications", "prescriptions", "emergency_config", "clinical_notes", "shift_logs"]:
     if k not in st.session_state:
         st.session_state[k] = [] if k != "emergency_config" else {"contact": "", "patient": ""}
 
-# --- SECURE AUTHENTICATION PORTAL WITH MFA ---
+# --- SECURE AUTHENTICATION PORTAL WITH SUPABASE EMAIL OTP ---
 def login_signup_portal():
     col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown("<h1 style='text-align: center;'>🛡️ CareLink Security Vault</h1>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align: center; color: {sub_text};'>MFA & IDPS Protected Enterprise Health-Tech</p><br>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center; color: {sub_text};'>Supabase Native Email OTP & Twilio WhatsApp Messaging</p><br>", unsafe_allow_html=True)
         
+        if not supabase or SUPABASE_URL == "YOUR_SUPABASE_PROJECT_URL":
+            st.warning("⚠️ **Setup Notice:** Please plug in your actual Supabase URL and Anon Key at the top of `app.py` to activate native database authentication.")
+
         if st.session_state.failed_login_attempts >= 3:
-            st.error("🚨 **IDPS SECURITY LOCKOUT:** Excessive failed login attempts detected. System temporarily locked for 60 seconds.")
+            st.error("🚨 **IDPS SECURITY LOCKOUT:** Excessive failed authentication attempts detected. System temporarily locked for 60 seconds.")
             log_security_event("Brute-Force Lockdown", "CRITICAL", "IP/Session locked due to 3 consecutive failed login failures.")
             if st.button("Reset Security Block", use_container_width=True):
                 st.session_state.failed_login_attempts = 0
                 st.rerun()
             return
 
+        # MFA Verification Stage (Supabase Email OTP verification)
         if st.session_state.mfa_state["pending"]:
-            st.info(f"📱 **MFA Challenge Sent:** Verification code dispatched via Twilio WhatsApp sandbox to `{st.session_state.mfa_state['phone']}`.")
+            st.info(f"📧 **Supabase OTP Challenge Sent:** A 6-digit verification code has been emailed to `{st.session_state.mfa_state['email']}`.")
             with st.form("mfa_verify_form"):
-                entered_otp = st.text_input("Enter 6-Digit OTP Code", max_chars=6)
+                entered_otp = st.text_input("Enter 6-Digit Email OTP Code", max_chars=6)
                 verify_submit = st.form_submit_button("Verify & Authorize", use_container_width=True)
                 
                 if verify_submit:
-                    if entered_otp == st.session_state.mfa_state["code"]:
-                        email = st.session_state.mfa_state["email"]
-                        role = st.session_state.mfa_state["role"]
-                        st.session_state.user = {"email": email, "role": role}
-                        st.query_params["user_email"] = email
-                        st.query_params["user_role"] = role
-                        
-                        st.session_state.mfa_state = {"pending": False, "email": "", "code": "", "role": "", "phone": ""}
-                        log_security_event("MFA Success", "LOW", f"User {email} successfully passed MFA challenge.")
-                        st.success("MFA Verified! Logging in...")
-                        st.rerun()
+                    if not supabase:
+                        st.error("Supabase client not initialized.")
                     else:
-                        log_security_event("MFA Failure", "HIGH", "Invalid OTP code entered during multi-factor verification.")
-                        st.error("Invalid verification code. Please try again.")
+                        try:
+                            res = supabase.auth.verify_otp({
+                                "email": st.session_state.mfa_state["email"],
+                                "token": entered_otp,
+                                "type": "email"
+                            })
+                            
+                            if res.session:
+                                email = st.session_state.mfa_state["email"]
+                                role = st.session_state.mfa_state["role"]
+                                st.session_state.user = {"email": email, "role": role}
+                                st.query_params["user_email"] = email
+                                st.query_params["user_role"] = role
+                                
+                                st.session_state.mfa_state = {"pending": False, "email": "", "role": ""}
+                                log_security_event("Supabase MFA Success", "LOW", f"User {email} successfully verified OTP.")
+                                st.success("Authentication Verified! Logging in...")
+                                st.rerun()
+                            else:
+                                log_security_event("Supabase MFA Failure", "HIGH", "Invalid or expired OTP token entered.")
+                                st.error("Invalid or expired verification code. Please try again.")
+                        except Exception as e:
+                            log_security_event("Supabase Auth Error", "HIGH", str(e))
+                            st.error(f"Verification error: {e}")
             return
 
-        tab1, tab2 = st.tabs(["Secure Login", "New Account Signup"])
+        tab1, tab2 = st.tabs(["Secure Login / OTP Request", "New Account Signup"])
         
         with tab1:
             with st.form("login_form"):
                 email = st.text_input("Email Address")
-                password = st.text_input("Password", type="password")
-                submit_login = st.form_submit_button("Proceed to MFA Verification", use_container_width=True)
+                selected_role = st.selectbox("Assign Session Role", ["Doctor / Admin", "Caregiver", "Family / Patient"])
+                submit_login = st.form_submit_button("Send Supabase OTP Code", use_container_width=True)
                 
                 if submit_login:
-                    if inspect_input_for_threats(email) or inspect_input_for_threats(password):
-                        st.error("🚨 IDPS Alert: Malicious characters detected in login request.")
+                    if inspect_input_for_threats(email):
+                        st.error("🚨 IDPS Alert: Malicious characters detected in request.")
                         st.rerun()
 
-                    if not email or not password:
-                        st.error("Please fill in all fields.")
-                    elif email in st.session_state.mock_db and st.session_state.mock_db[email]["password"] == password:
-                        user_record = st.session_state.mock_db[email]
-                        
-                        otp_code = str(random.randint(100000, 999999))
-                        st.session_state.mfa_state = {
-                            "pending": True,
-                            "email": email,
-                            "code": otp_code,
-                            "role": user_record["role"],
-                            "phone": user_record["phone"]
-                        }
-                        
-                        try:
-                            client = Client(TWILIO_SID, TWILIO_TOKEN)
-                            client.messages.create(
-                                body=f"🔐 CareLink Security: Your MFA verification code is {otp_code}.",
-                                from_="whatsapp:+14155238886",
-                                to=f"whatsapp:{user_record['phone']}"
-                            )
-                        except Exception as e:
-                            pass
-                        
-                        st.warning(f"⚠️ Twilio Sandbox International Routing Notice: Trial sandbox restricted delivery. [Presentation Debug OTP Code: **{otp_code}**]")
-                        log_security_event("Primary Auth Success", "LOW", f"Credentials verified for {email}. Triggered WhatsApp MFA dispatch.")
-                        st.rerun()
+                    if not email:
+                        st.error("Please enter your email address.")
+                    elif not supabase:
+                        st.error("Supabase credentials missing in code configuration.")
                     else:
-                        st.session_state.failed_login_attempts += 1
-                        log_security_event("Failed Login", "MEDIUM", f"Incorrect password attempt for {email}. Attempt #{st.session_state.failed_login_attempts}")
-                        st.error(f"Invalid email or password. Attempt {st.session_state.failed_login_attempts}/3.")
+                        try:
+                            supabase.auth.sign_in_with_otp({
+                                "email": email,
+                                "options": {
+                                    "should_create_user": False
+                                }
+                            })
+                            
+                            st.session_state.mfa_state = {
+                                "pending": True,
+                                "email": email,
+                                "role": selected_role
+                            }
+                            
+                            log_security_event("Supabase OTP Triggered", "LOW", f"OTP dispatch requested for {email}.")
+                            st.success(f"OTP successfully dispatched to {email} via Supabase!")
+                            st.rerun()
+                        except Exception as e:
+                            st.session_state.failed_login_attempts += 1
+                            log_security_event("Supabase Login Failed", "MEDIUM", str(e))
+                            st.error(f"Authentication notice: {e}. (Ensure email exists in your Supabase Auth users list).")
                         
         with tab2:
             with st.form("signup_form"):
                 new_email = st.text_input("Email Address")
                 new_password = st.text_input("Password", type="password")
-                new_phone = st.text_input("Phone Number", value="+2347038973019")
-                selected_role = st.selectbox("Select Account Role", ["Caregiver", "Family / Patient", "Doctor / Admin"])
+                signup_role = st.selectbox("Select Account Role", ["Caregiver", "Family / Patient", "Doctor / Admin"], key="su_role")
                 submit_signup = st.form_submit_button("Register Account", use_container_width=True)
                 
                 if submit_signup:
-                    if not new_email or not new_password or not new_phone:
-                        st.error("Please provide all fields.")
-                    elif new_email in st.session_state.mock_db:
-                        st.warning("Account already exists.")
+                    if not new_email or not new_password:
+                        st.error("Please provide email and password.")
+                    elif not supabase:
+                        st.error("Supabase credentials missing.")
                     else:
-                        st.session_state.mock_db[new_email] = {"password": new_password, "role": selected_role, "phone": new_phone}
-                        log_security_event("User Registration", "LOW", f"New account registered: {new_email} as {selected_role}")
-                        st.success("Account registered successfully! Please log in.")
+                        try:
+                            res = supabase.auth.sign_up({
+                                "email": new_email,
+                                "password": new_password
+                            })
+                            log_security_event("User Registration", "LOW", f"New Supabase account registered: {new_email}")
+                            st.success("Account registered successfully in Supabase! You can now log in.")
+                        except Exception as e:
+                            st.error(f"Registration error: {e}")
 
 # --- MAIN DASHBOARD ---
 def main_dashboard():
@@ -206,7 +236,7 @@ def main_dashboard():
     st.sidebar.markdown("### 🛡️ CareLink Security Hub")
     st.sidebar.markdown(f"**User:** `{user_email}`")
     st.sidebar.markdown(f"**Role:** `{user_role}`")
-    st.sidebar.markdown("Status: 🟢 **MFA Secured & IDPS Active**")
+    st.sidebar.markdown("Status: 🟢 **Supabase Auth & Twilio Active**")
     st.sidebar.markdown("---")
     
     chosen_theme = st.sidebar.radio("System Mode", ["Light", "Dark"], index=0 if st.session_state.theme_mode=="Light" else 1, horizontal=True)
@@ -223,19 +253,24 @@ def main_dashboard():
     
     st.sidebar.markdown("---")
     if st.sidebar.button("Log Out of Session", use_container_width=True):
+        if supabase:
+            try:
+                supabase.auth.sign_out()
+            except:
+                pass
         st.session_state.user = None
         st.query_params.clear()
         st.rerun()
 
     if menu == "Dashboard Overview":
         st.title("Dashboard Overview")
-        st.markdown(f"Welcome back. Workspace active under **{user_role}** permissions with end-to-end encryption & IDPS monitoring.")
+        st.markdown(f"Welcome back. Workspace active under **{user_role}** permissions with Supabase backend and IDPS monitoring.")
         
         col1, col2, col3, col4 = st.columns(4)
         with col1: st.metric("Active Vitals Logs", len(st.session_state.vitals_logs))
         with col2: st.metric("Prescriptions Tracked", len(st.session_state.prescriptions))
         with col3: st.metric("Security Incidents Logged", len(st.session_state.security_audit_logs))
-        with col4: st.metric("MFA Status", "Enforced")
+        with col4: st.metric("Auth Engine", "Supabase OTP")
 
     elif menu == "Vitals Log":
         st.title("🩺 Patient Vitals Monitor")
@@ -263,7 +298,35 @@ def main_dashboard():
 
     elif menu == "Care Schedule":
         st.title("📅 Care & Medication Schedule")
-        st.info("Centralized task manager active.")
+        st.markdown("Manage upcoming patient care slots and dispatch operational WhatsApp reminders via Twilio.")
+        
+        with st.form("schedule_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                sch_patient = st.text_input("Patient / Recipient Name")
+                sch_phone = st.text_input("Recipient Phone (e.g. +2347038973019)", value="+2347038973019")
+            with col2:
+                sch_time = st.text_input("Appointment Time/Date", "Tomorrow at 10:00 AM")
+                sch_desc = st.text_input("Care Activity / Medication Description", "Routine checkup and vitals review")
+            
+            submit_sch = st.form_submit_button("Save Schedule & Send WhatsApp Reminder", use_container_width=True)
+            if submit_sch:
+                if sch_patient and sch_phone:
+                    st.session_state.schedules.append({
+                        "patient": sch_patient, "phone": sch_phone, "time": sch_time, "desc": sch_desc
+                    })
+                    res_msg = send_whatsapp_appointment(sch_phone, f"Appointment for {sch_patient}: {sch_desc} at {sch_time}.")
+                    if res_msg is True:
+                        st.success("Schedule saved and WhatsApp notification dispatched successfully via Twilio!")
+                        log_security_event("WhatsApp Broadcast", "LOW", f"Sent appointment alert to {sch_phone}")
+                    else:
+                        st.warning(f"Schedule saved, but Twilio notification failed: {res_msg}")
+                else:
+                    st.error("Please provide patient name and phone number.")
+        
+        if st.session_state.schedules:
+            st.markdown("### Active Scheduled Tasks")
+            st.dataframe(st.session_state.schedules, use_container_width=True)
 
     elif menu == "Prescription Tracker":
         st.title("💊 Prescription & Refill Manager")
