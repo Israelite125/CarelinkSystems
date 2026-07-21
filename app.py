@@ -92,9 +92,9 @@ st.markdown(f"""
 # --- MOCK DATABASE ---
 if "mock_db" not in st.session_state:
     st.session_state.mock_db = {
-        "admin@carelink.com": {"password": "password123", "role": "Doctor / Admin", "phone": "+2348012345678"},
-        "caregiver@carelink.com": {"password": "password123", "role": "Caregiver", "phone": "+2348087654321"},
-        "family@carelink.com": {"password": "password123", "role": "Family / Patient", "phone": "+2348011223344"}
+        "admin@carelink.com": {"password": "password123", "role": "Doctor / Admin", "phone": "+2347038973019"},
+        "caregiver@carelink.com": {"password": "password123", "role": "Caregiver", "phone": "+2347038973019"},
+        "family@carelink.com": {"password": "password123", "role": "Family / Patient", "phone": "+2347038973019"}
     }
 
 for k in ["vitals_logs", "schedules", "notifications", "prescriptions", "emergency_config", "clinical_notes", "shift_logs"]:
