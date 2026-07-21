@@ -41,7 +41,6 @@ TWILIO_TOKEN = "3a62e0dfeedf90c44defebff884f88ea"
 
 # --- IDPS ENGINE: ANOMALY & INJECTION DETECTION ---
 def log_security_event(event_type, severity, description):
-    """Logs security telemetry for IDPS audit trail."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_entry = {
         "time": timestamp,
@@ -52,11 +51,9 @@ def log_security_event(event_type, severity, description):
     st.session_state.security_audit_logs.append(log_entry)
 
 def inspect_input_for_threats(user_input):
-    """Scans user input strings for SQL Injection & XSS attack vectors."""
     if not isinstance(user_input, str):
         return False
     
-    # Signature patterns for SQLi and XSS
     sql_patterns = re.compile(r"(union\s+select|drop\s+table|--|;|or\s+1=1|exec\()", re.IGNORECASE)
     xss_patterns = re.compile(r"(<script[^>]*?>.*?</script>|javascript:|onerror\s*=)", re.IGNORECASE)
     
@@ -89,7 +86,7 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# --- MOCK DATABASE ---
+# --- MOCK DATABASE WITH CONFIGURED PHONE NUMBER ---
 if "mock_db" not in st.session_state:
     st.session_state.mock_db = {
         "admin@carelink.com": {"password": "password123", "role": "Doctor / Admin", "phone": "+2347038973019"},
@@ -109,16 +106,14 @@ def login_signup_portal():
         st.markdown("<h1 style='text-align: center;'>🛡️ CareLink Security Vault</h1>", unsafe_allow_html=True)
         st.markdown(f"<p style='text-align: center; color: {sub_text};'>MFA & IDPS Protected Enterprise Health-Tech</p><br>", unsafe_allow_html=True)
         
-        # Check Brute Force Lockdown
         if st.session_state.failed_login_attempts >= 3:
-            st.error("🚨 **IDPS SECURITY LOCKOUT:** Excessive failed login attempts detected. System temporarily locked for 60 seconds to prevent credential stuffing.")
+            st.error("🚨 **IDPS SECURITY LOCKOUT:** Excessive failed login attempts detected. System temporarily locked for 60 seconds.")
             log_security_event("Brute-Force Lockdown", "CRITICAL", "IP/Session locked due to 3 consecutive failed login failures.")
             if st.button("Reset Security Block", use_container_width=True):
                 st.session_state.failed_login_attempts = 0
                 st.rerun()
             return
 
-        # MFA Verification Stage
         if st.session_state.mfa_state["pending"]:
             st.info(f"📱 **MFA Challenge Sent:** A 6-digit verification code has been dispatched to `{st.session_state.mfa_state['phone']}` via Twilio WhatsApp.")
             with st.form("mfa_verify_form"):
@@ -133,7 +128,6 @@ def login_signup_portal():
                         st.query_params["user_email"] = email
                         st.query_params["user_role"] = role
                         
-                        # Reset MFA state
                         st.session_state.mfa_state = {"pending": False, "email": "", "code": "", "role": "", "phone": ""}
                         log_security_event("MFA Success", "LOW", f"User {email} successfully passed MFA challenge.")
                         st.success("MFA Verified! Logging in...")
@@ -152,7 +146,6 @@ def login_signup_portal():
                 submit_login = st.form_submit_button("Proceed to MFA Verification", use_container_width=True)
                 
                 if submit_login:
-                    # IDPS Check for injection in inputs
                     if inspect_input_for_threats(email) or inspect_input_for_threats(password):
                         st.error("🚨 IDPS Alert: Malicious characters detected in login request.")
                         st.rerun()
@@ -162,7 +155,6 @@ def login_signup_portal():
                     elif email in st.session_state.mock_db and st.session_state.mock_db[email]["password"] == password:
                         user_record = st.session_state.mock_db[email]
                         
-                        # Generate 6-digit MFA Code
                         otp_code = str(random.randint(100000, 999999))
                         st.session_state.mfa_state = {
                             "pending": True,
@@ -172,7 +164,6 @@ def login_signup_portal():
                             "phone": user_record["phone"]
                         }
                         
-                        # Dispatch OTP via Twilio
                         try:
                             client = Client(TWILIO_SID, TWILIO_TOKEN)
                             client.messages.create(
@@ -181,7 +172,6 @@ def login_signup_portal():
                                 to=f"whatsapp:{user_record['phone']}"
                             )
                         except Exception as e:
-                            # Fallback display for testing if sandbox number isn't joined
                             st.warning(f"Twilio OTP Dispatch notice: {e}. [Debug Mode OTP: {otp_code}]")
                         
                         log_security_event("Primary Auth Success", "LOW", f"Credentials verified for {email}. Triggered MFA OTP dispatch.")
@@ -195,13 +185,13 @@ def login_signup_portal():
             with st.form("signup_form"):
                 new_email = st.text_input("Email Address")
                 new_password = st.text_input("Password", type="password")
-                new_phone = st.text_input("Phone Number (+234...)")
+                new_phone = st.text_input("Phone Number", value="+2347038973019")
                 selected_role = st.selectbox("Select Account Role", ["Caregiver", "Family / Patient", "Doctor / Admin"])
                 submit_signup = st.form_submit_button("Register Account", use_container_width=True)
                 
                 if submit_signup:
                     if not new_email or not new_password or not new_phone:
-                        st.error("Please provide all fields including phone number.")
+                        st.error("Please provide all fields.")
                     elif new_email in st.session_state.mock_db:
                         st.warning("Account already exists.")
                     else:
@@ -209,7 +199,7 @@ def login_signup_portal():
                         log_security_event("User Registration", "LOW", f"New account registered: {new_email} as {selected_role}")
                         st.success("Account registered successfully! Please log in.")
 
-# --- MAIN DASHBOARD (WITH IDPS SIEM PANEL) ---
+# --- MAIN DASHBOARD ---
 def main_dashboard():
     user_data = st.session_state.user
     user_email = user_data.get("email") if isinstance(user_data, dict) else "admin@carelink.com"
@@ -262,7 +252,6 @@ def main_dashboard():
             
             submit_vitals = st.form_submit_button("Record Vitals", use_container_width=True)
             if submit_vitals:
-                # IDPS sanitization check
                 if inspect_input_for_threats(patient_name) or inspect_input_for_threats(bp):
                     st.error("🚨 IDPS Alert: Malicious script pattern blocked in form submission.")
                 elif patient_name:
