@@ -84,12 +84,13 @@ def login_signup_portal():
                     st.error(f"Registration error: {e}")
 
 def main_dashboard():
-    # Updated Sidebar Heading as requested
+    # Updated Sidebar Heading
     st.sidebar.markdown("### 🩺 CareLink System")
+    
+    # Safely extract user email from Supabase User object
     user = st.session_state.get("user")
-user_email = getattr(user, "email", "User") if user else "User"
-
-st.sidebar.markdown(f"**Logged in as:** {user_email}")
+    user_email = getattr(user, "email", "User") if user else "User"
+    st.sidebar.markdown(f"**Logged in as:** {user_email}")
     
     menu = st.sidebar.selectbox(
         "Navigation Menu", 
@@ -128,12 +129,3 @@ st.sidebar.markdown(f"**Logged in as:** {user_email}")
     elif menu == "Emergency SOS":
         st.title("Emergency SOS Broadcast")
         st.error("Trigger instant alerts and notifications to designated emergency responders and caregivers.")
-
-def main():
-    if 'user' not in st.session_state or st.session_state['user'] is None:
-        login_signup_portal()
-    else:
-        main_dashboard()
-
-if __name__ == "__main__":
-    main()
