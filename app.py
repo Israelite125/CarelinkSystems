@@ -9,22 +9,17 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Credentials defined directly
-SUPABASE_URL = "https://mkdvkaraqdjsxgxqjnhg.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rZHZrYXJhcWRqc3hneHFqbmhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NDgwMzMsImV4cCI6MjEwMDEyNDAzM30.bKkl_O1FtV1iMkbFsTKF06W8hOTpRYQbt7fpFdkGGaI"
+# Credentials (Streamlit Secrets with fallback)
+try:
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+except Exception:
+    SUPABASE_URL = "https://mkdvkaraqdjsxgxqjnhg.supabase.co"
+    SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rZHZrYXJhcWRqc3hneHFqbmhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NDgwMzMsImV4cCI6MjEwMDEyNDAzM30.bKkl_O1FtV1iMkbFsTKF06W8hOTpRYQbt7fpFdkGGaI"
 
 @st.cache_resource
 def init_supabase():
-    clean_url = (
-        SUPABASE_URL.strip()
-        .rstrip("/")
-        .replace("/rest/v1", "")
-        .replace("/auth/v1", "")
-    )
-    return create_client(clean_url, SUPABASE_KEY)
-
-supabase = init_supabase()
-    )
+    clean_url = SUPABASE_URL.strip().rstrip("/").replace("/rest/v1", "").replace("/auth/v1", "")
     return create_client(clean_url, SUPABASE_KEY)
 
 supabase = init_supabase()
@@ -87,7 +82,7 @@ def login_signup_portal():
                     st.error(f"Registration error: {e}")
 
 def main_dashboard():
-    # Updated Sidebar Heading
+    # Sidebar Heading
     st.sidebar.markdown("### 🩺 CareLink System")
     
     # Safely extract user email from Supabase User object
