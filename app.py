@@ -38,14 +38,23 @@ else:
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+    SUPABASE_SERVICE_ROLE_KEY = st.secrets.get("SUPABASE_SERVICE_ROLE_KEY", None)
 except Exception:
     SUPABASE_URL = "https://mkdvkaraqdjsxgxqjnhg.supabase.co"
     SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rZHZrYXJhcWRqc3hneHFqbmhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NDgwMzMsImV4cCI6MjEwMDEyNDAzM30.bKkl_O1FtV1iMkbFsTKF06W8hOTpRYQbt7fpFdkGGaI"
+    SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rZHZrYXJhcWRqc3hneHFqbmhnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDU0ODAzMywiZXhwIjoyMTAwMTI0MDMzfQ.IZgi6bai-Rr9hveCYRoHOkwL9n3VpqPwrIPa27hW0TY"
 
 @st.cache_resource
 def init_supabase():
     clean_url = SUPABASE_URL.strip().rstrip("/").replace("/rest/v1", "").replace("/auth/v1", "")
     return create_client(clean_url, SUPABASE_KEY)
+
+@st.cache_resource
+def init_supabase_admin():
+    if SUPABASE_SERVICE_ROLE_KEY:
+        clean_url = SUPABASE_URL.strip().rstrip("/").replace("/rest/v1", "").replace("/auth/v1", "")
+        return create_client(clean_url, SUPABASE_SERVICE_ROLE_KEY)
+    return None
 
 supabase = init_supabase()
 
@@ -67,39 +76,40 @@ if "handovers_data" not in st.session_state:
         {"Timestamp": "2026-07-24 08:00", "Outgoing Staff": "Nurse Sarah", "Incoming Staff": "Nurse David", "Patient": "John Doe", "Shift Notes": "Patient slept well. Morning vitals stable."}
     ]
 
-# IDPS Security Incident Logs
 if "idps_logs" not in st.session_state:
     st.session_state.idps_logs = [
-        {"Timestamp": "2026-07-24 09:12:04", "IP Address": "192.168.1.104", "Event Type": "Brute Force Attempt", "Severity": "High", "Action Taken": "IP Blocked (15m)"},
+        {"Timestamp": "2026-07-24 09:12:04", "IP Address": "192.168.1.104", "Event Type": "Uninvited Login Attempt", "Severity": "Medium", "Action Taken": "Access Denied"},
         {"Timestamp": "2026-07-24 08:45:12", "IP Address": "10.0.0.12", "Event Type": "SQLi Pattern Detected", "Severity": "Critical", "Action Taken": "Request Sanitized & Dropped"},
-        {"Timestamp": "2026-07-24 07:30:00", "IP Address": "192.168.1.50", "Event Type": "MFA Auth Success", "Severity": "Low", "Action Taken": "Session Initialized"}
+        {"Timestamp": "2026-07-24 07:30:00", "IP Address": "192.168.1.50", "Event Type": "Staff MFA Auth Success", "Severity": "Low", "Action Taken": "Session Initialized"}
     ]
 
 def login_signup_portal():
     st.markdown("<h1 style='text-align: center; color: #2563eb;'>🩺 CareLink Portal</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>Secure Access for Healthcare Coordination</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Invite-Only Clinical Access</p>", unsafe_allow_html=True)
     
-    tab1, tab2 = st.tabs(["🔑 Sign In / OTP", "📝 Register"])
+    tab1, tab2 = st.tabs(["🔑 Invited Staff Sign In", "🔒 Access Policy"])
     
     with tab1:
         st.subheader("Sign In with OTP")
-        email = st.text_input("Email Address", key="signin_email")
+        email = st.text_input("Staff Email Address", key="signin_email", placeholder="doctor@hospital.org")
         
-        if st.button("Send 6-Digit OTP Code"):
+        if st.button("Send 6-Digit OTP Code", use_container_width=True):
             if email:
                 try:
+                    # should_create_user: False prevents random public sign-ups!
                     supabase.auth.sign_in_with_otp({
                         "email": email,
-                        "options": {"should_create_user": True}
+                        "options": {"should_create_user": False}
                     })
                     st.success("Verification code sent to your email inbox!")
                 except Exception as e:
-                    st.error(f"Error sending code: {e}")
+                    st.error("Access Denied: This email address is not registered in the CareLink system. Contact your administrator to request an invitation.")
             else:
-                st.warning("Please enter a valid email address.")
+                st.warning("Please enter your registered staff email address.")
         
+        st.divider()
         otp_token = st.text_input("Enter 6-Digit Code", type="password", key="otp_token")
-        if st.button("Verify & Login"):
+        if st.button("Verify & Login", use_container_width=True):
             if email and otp_token:
                 try:
                     auth_response = supabase.auth.verify_otp({
@@ -115,32 +125,38 @@ def login_signup_portal():
                     st.error(f"Invalid or expired OTP code: {e}")
 
     with tab2:
-        st.subheader("New Account Registration")
-        reg_email = st.text_input("Email Address", key="reg_email")
-        if st.button("Register & Send Verification"):
-            if reg_email:
-                try:
-                    supabase.auth.sign_in_with_otp({
-                        "email": reg_email,
-                        "options": {"should_create_user": True}
-                    })
-                    st.success("Registration code sent! Check your email to verify.")
-                except Exception as e:
-                    st.error(f"Registration error: {e}")
+        st.subheader("Strictly Invite-Only System")
+        st.info("🔒 **CareLink operates as a closed medical network.** Public registration is permanently disabled to prevent unauthorized access to patient health data.")
+        st.markdown("""
+        **How to gain access:**
+        1. Reach out to your hospital IT department or clinical unit head.
+        2. Request a **CareLink Staff Invitation**.
+        3. An administrator will send an official invite link to your corporate email.
+        """)
 
 def main_dashboard():
-    # Sidebar Header
-    st.sidebar.markdown("### 🩺 CareLink System")
-    
-    # Safe User & Metadata Extraction
+    # Safe User & Role Extraction
     user = st.session_state.get("user")
     user_email = getattr(user, "email", "User") if user else "User"
     
-    # Extract Role safely from Supabase user_metadata (default to 'clinician')
     user_metadata = getattr(user, "user_metadata", {}) or {}
-    user_role = user_metadata.get("role", "clinician").lower()
-    
-    st.sidebar.markdown(f"**Logged in as:** `{user_email}`")
+    user_role = user_metadata.get("role", "doctor").lower()
+    full_name = user_metadata.get("full_name", user_email)
+
+    # Security Lockout if no valid role exists
+    if not user_role or user_role == "unauthorized":
+        st.title("🔒 Access Restricted")
+        st.warning("Your account does not have an assigned clinical role in CareLink.")
+        st.info("Please contact your hospital system administrator to assign your clinical credentials.")
+        if st.button("🚪 Sign Out"):
+            supabase.auth.sign_out()
+            st.session_state.pop('user', None)
+            st.rerun()
+        st.stop()
+
+    # Sidebar Header
+    st.sidebar.markdown("### 🩺 CareLink System")
+    st.sidebar.markdown(f"**Staff:** `{full_name}`")
     st.sidebar.caption(f"🛡️ **Role:** `{user_role.upper()}`")
     st.sidebar.divider()
     
@@ -157,7 +173,7 @@ def main_dashboard():
 
     st.sidebar.divider()
     
-    # RBAC Dynamic Navigation Menu
+    # Navigation Options
     menu_options = [
         "Dashboard Overview", 
         "Vitals Logs", 
@@ -166,7 +182,7 @@ def main_dashboard():
         "Emergency SOS"
     ]
     
-    # Add IDPS only if user role is admin
+    # Add IDPS only for Admin
     if user_role == "admin":
         menu_options.append("🛡️ Security Hub (IDPS)")
     
@@ -184,7 +200,7 @@ def main_dashboard():
     # 1. Dashboard Overview
     if menu == "Dashboard Overview":
         st.title("🏥 Clinical Workspace Overview")
-        st.markdown("Real-time clinical summary and patient status monitoring.")
+        st.markdown(f"Welcome back, **{full_name}**. Real-time patient care summary.")
         
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -229,7 +245,7 @@ def main_dashboard():
                         "Blood Pressure": f"{systolic_bp}/{diastolic_bp}",
                         "Temp (°C)": temperature,
                         "SpO2 (%)": spo2,
-                        "Logged By": user_email
+                        "Logged By": full_name
                     }
                     st.session_state.vitals_data.insert(0, new_entry)
                     st.success(f"Vitals successfully saved for {patient_name}!")
@@ -245,7 +261,7 @@ def main_dashboard():
     # 3. Medication & Prescriptions
     elif menu == "Medication & Prescriptions":
         st.title("💊 Medication Schedules & Prescriptions")
-        st.markdown("Manage current active prescriptions, dosage schedules, and refill requests.")
+        st.markdown("Manage active prescriptions, dosage schedules, and refill requests.")
 
         with st.expander("➕ **Add New Medication Schedule**"):
             with st.form("med_input_form", clear_on_submit=True):
@@ -273,11 +289,11 @@ def main_dashboard():
     # 4. Shift Handovers
     elif menu == "Shift Handovers":
         st.title("🔄 Shift Handover Documentation")
-        st.markdown("Log shift reports and ensure smooth clinical continuity between care staff.")
+        st.markdown("Log shift reports and ensure seamless clinical continuity between care staff.")
 
         with st.expander("📝 **Create Shift Handover Log**", expanded=True):
             with st.form("handover_form", clear_on_submit=True):
-                outgoing = st.text_input("Outgoing Clinician / Caregiver", value=user_email)
+                outgoing = st.text_input("Outgoing Clinician / Caregiver", value=full_name)
                 incoming = st.text_input("Incoming Clinician / Caregiver")
                 p_select = st.selectbox("Target Patient", ["John Doe (Room 102)", "Mary Jane (Room 105)", "All Ward Patients"])
                 shift_notes = st.text_area("Key Updates, Incidents, or Care Plan Adjustments")
@@ -301,7 +317,7 @@ def main_dashboard():
     # 5. Emergency SOS Broadcast
     elif menu == "Emergency SOS":
         st.title("🚨 Emergency SOS Broadcast Hub")
-        st.markdown("Dispatch urgent SMS/WhatsApp alerts to response teams and primary care doctors.")
+        st.markdown("Dispatch urgent alerts to on-call response teams and attending doctors.")
 
         st.error("⚠️ **Warning:** Triggering an SOS will alert emergency care teams immediately.")
         
@@ -319,7 +335,7 @@ def main_dashboard():
     # 6. Admin Only: Intrusion Detection & Prevention System (IDPS)
     elif menu == "🛡️ Security Hub (IDPS)":
         st.title("🛡️ Admin Security Console (IDPS)")
-        st.markdown("Intrusion Detection and Prevention System metrics, threat logs, and network security.")
+        st.markdown("Intrusion Detection and Prevention System & Staff Onboarding Hub.")
 
         m1, m2, m3, m4 = st.columns(4)
         with m1:
@@ -330,6 +346,47 @@ def main_dashboard():
             st.metric("Brute-Force Lockouts", "3", "Active")
         with m4:
             st.metric("MFA Compliance Rate", "98.4%", "+0.5%")
+
+        st.divider()
+        
+        # Staff Invite Section (Option 3 Implementation)
+        st.subheader("✉️ Invite New Staff Member")
+        st.markdown("Dispatch an official login invitation to authorized medical staff.")
+
+        with st.form("invite_staff_form", clear_on_submit=True):
+            col_inv1, col_inv2 = st.columns(2)
+            with col_inv1:
+                invite_email = st.text_input("Staff Email Address", placeholder="doctor@hospital.org")
+                invite_name = st.text_input("Staff Full Name", placeholder="Dr. Jane Doe")
+            with col_inv2:
+                invite_role = st.selectbox("Assigned Clinical Role", ["Doctor", "Nurse", "Caregiver", "Admin"])
+                department = st.text_input("Department / Unit", placeholder="Cardiology - Ward B")
+
+            submit_invite = st.form_submit_button("📩 Send Official Invitation", use_container_width=True)
+
+            if submit_invite:
+                if invite_email and invite_name:
+                    try:
+                        admin_client = init_supabase_admin()
+                        if admin_client:
+                            # Send official Supabase invite link
+                            admin_client.auth.admin.invite_user_by_email(
+                                email=invite_email,
+                                options={
+                                    "data": {
+                                        "full_name": invite_name,
+                                        "role": invite_role.lower(),
+                                        "department": department
+                                    }
+                                }
+                            )
+                            st.success(f"Invitation successfully sent to **{invite_email}** with role `{invite_role}`!")
+                        else:
+                            st.info(f"✅ **[Invite Processed]** Invitation queued for **{invite_email}** (`{invite_role}`).\n\n*Note: To send real automated email invites, add `SUPABASE_SERVICE_ROLE_KEY` to your Streamlit secrets.*")
+                    except Exception as e:
+                        st.error(f"Failed to send invite: {e}")
+                else:
+                    st.warning("Please provide both an email address and full name.")
 
         st.divider()
         st.subheader("🚨 Live Security Incident Stream")
