@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 # Initialize Supabase Client (Replace with your actual Supabase URL and Anon Key)
-SUPABASE_URL = "https://mkdvkaraqdjsxgxqjnhg.supabase.co/rest/v1/"
+SUPABASE_URL = "https://mkdvkaraqdjsxgxqjnhg.supabase.co/rest/v1"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rZHZrYXJhcWRqc3hneHFqbmhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NDgwMzMsImV4cCI6MjEwMDEyNDAzM30.bKkl_O1FtV1iMkbFsTKF06W8hOTpRYQbt7fpFdkGGaI"
 
 @st.cache_resource
