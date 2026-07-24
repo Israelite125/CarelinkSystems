@@ -11,25 +11,56 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom Styling for Clinical UI
-st.markdown("""
-    <style>
-    .stApp {
-        background-color: #f8fafc;
-    }
-    .metric-card {
-        background-color: #ffffff;
-        padding: 18px;
-        border-radius: 10px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    .stButton>button {
-        border-radius: 6px;
-        font-weight: 600;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# Initialize Session Theme State
+if "theme_mode" not in st.session_state:
+    st.session_state.theme_mode = "Light Mode ☀️"
+
+# Dynamic Theme Injection
+if "Dark" in st.session_state.theme_mode:
+    st.markdown("""
+        <style>
+        .stApp {
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        div[data-testid="stSidebar"] {
+            background-color: #1e293b;
+        }
+        div[data-testid="stForm"] {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .metric-card {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+        <style>
+        .stApp {
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+        div[data-testid="stForm"] {
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .metric-card {
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
 # Credentials (Streamlit Secrets with Fallback)
 try:
@@ -125,6 +156,19 @@ def main_dashboard():
     user = st.session_state.get("user")
     user_email = getattr(user, "email", "User") if user else "User"
     st.sidebar.markdown(f"**Logged in as:** `{user_email}`")
+    st.sidebar.divider()
+    
+    # Theme Selector
+    selected_theme = st.sidebar.radio(
+        "🎨 Interface Theme",
+        ["Light Mode ☀️", "Dark Mode 🌙"],
+        index=0 if st.session_state.theme_mode == "Light Mode ☀️" else 1
+    )
+    
+    if selected_theme != st.session_state.theme_mode:
+        st.session_state.theme_mode = selected_theme
+        st.rerun()
+
     st.sidebar.divider()
     
     menu = st.sidebar.radio(
