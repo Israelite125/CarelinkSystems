@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import random
+import string
 from datetime import datetime
 from supabase import create_client, Client
 
@@ -58,7 +60,14 @@ def init_supabase_admin():
 
 supabase = init_supabase()
 
-# Initialize Session Data
+# Initialize Patient Access Codes Store
+if "patient_access_codes" not in st.session_state:
+    st.session_state.patient_access_codes = {
+        "PAT-1020": "John Doe (Room 102)",
+        "PAT-1050": "Mary Jane (Room 105)"
+    }
+
+# Initialize Clinical Data
 if "vitals_data" not in st.session_state:
     st.session_state.vitals_data = [
         {"Timestamp": "2026-07-24 10:30", "Patient": "John Doe (Room 102)", "Heart Rate (BPM)": 78, "Blood Pressure": "120/80", "Temp (°C)": 36.8, "SpO2 (%)": 98, "Logged By": "Dr. Smith"},
@@ -79,80 +88,158 @@ if "handovers_data" not in st.session_state:
 if "idps_logs" not in st.session_state:
     st.session_state.idps_logs = [
         {"Timestamp": "2026-07-24 09:12:04", "IP Address": "192.168.1.104", "Event Type": "Uninvited Login Attempt", "Severity": "Medium", "Action Taken": "Access Denied"},
-        {"Timestamp": "2026-07-24 08:45:12", "IP Address": "10.0.0.12", "Event Type": "SQLi Pattern Detected", "Severity": "Critical", "Action Taken": "Request Sanitized & Dropped"},
-        {"Timestamp": "2026-07-24 07:30:00", "IP Address": "192.168.1.50", "Event Type": "Staff MFA Auth Success", "Severity": "Low", "Action Taken": "Session Initialized"}
+        {"Timestamp": "2026-07-24 08:45:12", "IP Address": "10.0.0.12", "Event Type": "SQLi Pattern Detected", "Severity": "Critical", "Action Taken": "Request Sanitized & Dropped"}
     ]
 
 def login_signup_portal():
     st.markdown("<h1 style='text-align: center; color: #2563eb;'>🩺 CareLink Portal</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>Invite-Only Clinical Access</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Secure Healthcare Access for Staff & Patients</p>", unsafe_allow_html=True)
     
-    tab1, tab2 = st.tabs(["🔑 Invited Staff Sign In", "🔒 Access Policy"])
+    tab1, tab2, tab3 = st.tabs(["👨‍⚕️ Clinical Staff Sign In", "🏥 Patient Registration", "🔒 Access Info"])
     
+    # 1. Staff Login
     with tab1:
-        st.subheader("Sign In with OTP")
-        email = st.text_input("Staff Email Address", key="signin_email", placeholder="doctor@hospital.org")
+        st.subheader("Invited Staff OTP Sign In")
+        email = st.text_input("Staff Email Address", key="staff_signin_email", placeholder="doctor@hospital.org")
         
-        if st.button("Send 6-Digit OTP Code", use_container_width=True):
+        if st.button("Send 6-Digit OTP Code", key="btn_staff_otp", use_container_width=True):
             if email:
                 try:
-                    # should_create_user: False prevents random public sign-ups!
                     supabase.auth.sign_in_with_otp({
                         "email": email,
                         "options": {"should_create_user": False}
                     })
                     st.success("Verification code sent to your email inbox!")
                 except Exception as e:
-                    st.error("Access Denied: This email address is not registered in the CareLink system. Contact your administrator to request an invitation.")
+                    st.error("Access Denied: Unregistered staff email. Contact your admin for an invitation.")
             else:
-                st.warning("Please enter your registered staff email address.")
+                st.warning("Please enter your registered staff email.")
         
         st.divider()
-        otp_token = st.text_input("Enter 6-Digit Code", type="password", key="otp_token")
-        if st.button("Verify & Login", use_container_width=True):
+        otp_token = st.text_input("Enter 6-Digit OTP Code", type="password", key="staff_otp_token")
+        if st.button("Verify & Login as Staff", key="btn_staff_login", use_container_width=True):
             if email and otp_token:
                 try:
-                    auth_response = supabase.auth.verify_otp({
-                        "email": email,
-                        "token": otp_token,
-                        "type": "email"
-                    })
+                    auth_response = supabase.auth.verify_otp({"email": email, "token": otp_token, "type": "email"})
                     if auth_response.session:
                         st.session_state['user'] = auth_response.user
                         st.success("Login successful!")
                         st.rerun()
                 except Exception as e:
-                    st.error(f"Invalid or expired OTP code: {e}")
+                    st.error(f"Invalid or expired OTP: {e}")
 
+    # 2. Patient Registration via Access Code
     with tab2:
-        st.subheader("Strictly Invite-Only System")
-        st.info("🔒 **CareLink operates as a closed medical network.** Public registration is permanently disabled to prevent unauthorized access to patient health data.")
-        st.markdown("""
-        **How to gain access:**
-        1. Reach out to your hospital IT department or clinical unit head.
-        2. Request a **CareLink Staff Invitation**.
-        3. An administrator will send an official invite link to your corporate email.
-        """)
+        st.subheader("Activate Patient Access")
+        st.caption("Enter the 6-digit Patient Access Code printed on your intake document or wristband.")
+        
+        p_email = st.text_input("Patient / Family Email Address", key="pat_email")
+        access_code = st.text_input("Patient Access Code", key="pat_code", placeholder="PAT-1020").strip().upper()
+        
+        if st.button("Activate Account & Send OTP", key="btn_pat_reg", use_container_width=True):
+            if p_email and access_code:
+                if access_code in st.session_state.patient_access_codes:
+                    linked_patient = st.session_state.patient_access_codes[access_code]
+                    try:
+                        # Register patient with linked metadata
+                        supabase.auth.sign_in_with_otp({
+                            "email": p_email,
+                            "options": {
+                                "should_create_user": True,
+                                "data": {
+                                    "full_name": linked_patient.split(" (")[0],
+                                    "role": "patient",
+                                    "linked_patient": linked_patient
+                                }
+                            }
+                        })
+                        st.success(f"Access Code verified for **{linked_patient}**! Verification code sent to {p_email}.")
+                    except Exception as e:
+                        st.error(f"Error sending code: {e}")
+                else:
+                    st.error("Invalid Patient Access Code. Please check your intake card or contact nursing staff.")
+            else:
+                st.warning("Please provide both your email and Patient Access Code.")
 
-def main_dashboard():
-    # Safe User & Role Extraction
-    user = st.session_state.get("user")
-    user_email = getattr(user, "email", "User") if user else "User"
+        st.divider()
+        pat_otp = st.text_input("Enter 6-Digit OTP Code", type="password", key="pat_otp_token")
+        if st.button("Verify & Enter Patient Portal", key="btn_pat_login", use_container_width=True):
+            if p_email and pat_otp:
+                try:
+                    auth_response = supabase.auth.verify_otp({"email": p_email, "token": pat_otp, "type": "email"})
+                    if auth_response.session:
+                        st.session_state['user'] = auth_response.user
+                        st.success("Welcome to your Patient Portal!")
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Invalid OTP code: {e}")
+
+    # 3. Access Policy Info
+    with tab3:
+        st.subheader("Security & Privacy Guidelines")
+        st.info("🔒 CareLink enforces strict role isolation. Staff require administrator invitations, while patients require verified wristband access codes issued during hospital intake.")
+
+# Patient Restricted View
+def patient_dashboard(user, user_metadata):
+    full_name = user_metadata.get("full_name", "Patient")
+    linked_patient = user_metadata.get("linked_patient", "")
+
+    st.sidebar.markdown("### 🩺 CareLink Patient Portal")
+    st.sidebar.markdown(f"**Patient:** `{full_name}`")
+    st.sidebar.caption(f"🏥 **Linked Record:** `{linked_patient}`")
+    st.sidebar.divider()
     
+    if st.sidebar.button("🚪 Sign Out", use_container_width=True):
+        try:
+            supabase.auth.sign_out()
+        except Exception:
+            pass
+        st.session_state.pop('user', None)
+        st.rerun()
+
+    st.title(f"👋 Welcome, {full_name}")
+    st.markdown("Track your personal health vitals, active prescriptions, and care plan.")
+
+    p_menu = st.tabs(["🫀 My Vitals History", "💊 My Prescriptions", "🚨 Request Assistance"])
+
+    with p_menu[0]:
+        st.subheader("Your Latest Health Metrics")
+        # Filter vitals strictly for this patient
+        my_vitals = [v for v in st.session_state.vitals_data if v["Patient"] == linked_patient]
+        if my_vitals:
+            df_my_vitals = pd.DataFrame(my_vitals)
+            st.dataframe(df_my_vitals[["Timestamp", "Heart Rate (BPM)", "Blood Pressure", "Temp (°C)", "SpO2 (%)"]], use_container_width=True)
+        else:
+            st.info("No recorded vitals available for your profile yet.")
+
+    with p_menu[1]:
+        st.subheader("Your Active Prescriptions")
+        # Filter medications strictly for this patient
+        my_meds = [m for m in st.session_state.medications_data if m["Patient"] == linked_patient]
+        if my_meds:
+            df_my_meds = pd.DataFrame(my_meds)
+            st.dataframe(df_my_meds[["Medication", "Dosage", "Frequency", "Status"]], use_container_width=True)
+        else:
+            st.info("No active prescription records found.")
+
+    with p_menu[2]:
+        st.subheader("🚨 Call Nurse / Request Assistance")
+        st.markdown("Need urgent assistance in your room or from your assigned caregiver?")
+        if st.button("🔔 CALL ATTENDING NURSE NOW", use_container_width=True):
+            st.success(f"Notification sent to the nursing station for {linked_patient}!")
+
+# Main Clinical & Staff Dashboard
+def main_dashboard():
+    user = st.session_state.get("user")
     user_metadata = getattr(user, "user_metadata", {}) or {}
     user_role = user_metadata.get("role", "doctor").lower()
-    full_name = user_metadata.get("full_name", user_email)
+    
+    # Route Patient accounts to the restricted Patient Portal
+    if user_role == "patient":
+        patient_dashboard(user, user_metadata)
+        return
 
-    # Security Lockout if no valid role exists
-    if not user_role or user_role == "unauthorized":
-        st.title("🔒 Access Restricted")
-        st.warning("Your account does not have an assigned clinical role in CareLink.")
-        st.info("Please contact your hospital system administrator to assign your clinical credentials.")
-        if st.button("🚪 Sign Out"):
-            supabase.auth.sign_out()
-            st.session_state.pop('user', None)
-            st.rerun()
-        st.stop()
+    full_name = user_metadata.get("full_name", getattr(user, "email", "Staff"))
 
     # Sidebar Header
     st.sidebar.markdown("### 🩺 CareLink System")
@@ -176,13 +263,13 @@ def main_dashboard():
     # Navigation Options
     menu_options = [
         "Dashboard Overview", 
+        "Patient Access Codes",
         "Vitals Logs", 
         "Medication & Prescriptions", 
         "Shift Handovers", 
         "Emergency SOS"
     ]
     
-    # Add IDPS only for Admin
     if user_role == "admin":
         menu_options.append("🛡️ Security Hub (IDPS)")
     
@@ -200,7 +287,7 @@ def main_dashboard():
     # 1. Dashboard Overview
     if menu == "Dashboard Overview":
         st.title("🏥 Clinical Workspace Overview")
-        st.markdown(f"Welcome back, **{full_name}**. Real-time patient care summary.")
+        st.markdown(f"Welcome back, **{full_name}**.")
         
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -215,18 +302,40 @@ def main_dashboard():
         st.divider()
         st.subheader("📋 Recent Clinical Alerts")
         st.warning("⚠️ **Mary Jane (Room 105):** Elevated Heart Rate (105 BPM) & Temp (38.2 °C) logged at 11:15 AM.")
-        st.info("ℹ️ **John Doe (Room 102):** Scheduled for afternoon vitals check at 14:00.")
 
-    # 2. Vitals Logs
+    # 2. Patient Access Codes (Clinician Issue Hub)
+    elif menu == "Patient Access Codes":
+        st.title("🎫 Patient Intake & Access Code Issuer")
+        st.markdown("Generate secure access codes to grant patients portal access.")
+
+        with st.form("issue_code_form", clear_on_submit=True):
+            col_c1, col_c2 = st.columns(2)
+            with col_c1:
+                p_name_input = st.text_input("Patient Full Name", placeholder="e.g. Robert Chen")
+            with col_c2:
+                p_room_input = st.text_input("Room / Ward Number", placeholder="e.g. Room 201")
+            
+            submit_gen_code = st.form_submit_button("🔑 Generate Patient Access Code", use_container_width=True)
+            
+            if submit_gen_code and p_name_input:
+                new_code = f"PAT-{''.join(random.choices(string.digits, k=4))}"
+                patient_label = f"{p_name_input} ({p_room_input})" if p_room_input else p_name_input
+                st.session_state.patient_access_codes[new_code] = patient_label
+                st.success(f"Access Code **`{new_code}`** generated for **{patient_label}**!")
+
+        st.divider()
+        st.subheader("📋 Active Patient Access Codes")
+        df_codes = pd.DataFrame([{"Access Code": k, "Linked Patient Record": v} for k, v in st.session_state.patient_access_codes.items()])
+        st.dataframe(df_codes, use_container_width=True)
+
+    # 3. Vitals Logs
     elif menu == "Vitals Logs":
         st.title("🫀 Patient Vitals Tracker")
-        st.markdown("Record and track real-time physiological metrics for active patients.")
-
         with st.expander("➕ **Log New Patient Vitals**", expanded=True):
             with st.form("vitals_input_form", clear_on_submit=True):
                 col_a, col_b = st.columns(2)
                 with col_a:
-                    patient_name = st.selectbox("Select Patient", ["John Doe (Room 102)", "Mary Jane (Room 105)", "Robert Chen (Room 201)", "Alice Smith (Room 204)"])
+                    patient_name = st.selectbox("Select Patient", ["John Doe (Room 102)", "Mary Jane (Room 105)", "Robert Chen (Room 201)"])
                     heart_rate = st.number_input("Heart Rate (BPM)", min_value=30, max_value=220, value=75)
                     systolic_bp = st.number_input("Systolic BP (mmHg)", min_value=60, max_value=240, value=120)
                 with col_b:
@@ -250,148 +359,28 @@ def main_dashboard():
                     st.session_state.vitals_data.insert(0, new_entry)
                     st.success(f"Vitals successfully saved for {patient_name}!")
 
-                    if spo2 < 95 or heart_rate > 100 or temperature >= 38.0:
-                        st.error("🚨 ALERT: Entered vitals fall outside normal clinical thresholds!")
-
         st.divider()
-        st.subheader("📊 Logged Vitals History")
-        df_vitals = pd.DataFrame(st.session_state.vitals_data)
-        st.dataframe(df_vitals, use_container_width=True)
+        st.dataframe(pd.DataFrame(st.session_state.vitals_data), use_container_width=True)
 
-    # 3. Medication & Prescriptions
+    # 4. Medication & Prescriptions
     elif menu == "Medication & Prescriptions":
         st.title("💊 Medication Schedules & Prescriptions")
-        st.markdown("Manage active prescriptions, dosage schedules, and refill requests.")
+        st.dataframe(pd.DataFrame(st.session_state.medications_data), use_container_width=True)
 
-        with st.expander("➕ **Add New Medication Schedule**"):
-            with st.form("med_input_form", clear_on_submit=True):
-                patient = st.selectbox("Patient Name", ["John Doe (Room 102)", "Mary Jane (Room 105)", "Robert Chen (Room 201)"])
-                med_name = st.text_input("Medication Name", placeholder="e.g. Metformin")
-                dosage = st.text_input("Dosage", placeholder="e.g. 500mg")
-                freq = st.selectbox("Frequency", ["Once Daily", "Twice Daily", "Three Times Daily", "As Needed (PRN)"])
-                
-                submit_med = st.form_submit_button("➕ Save Prescription", use_container_width=True)
-                if submit_med and med_name:
-                    st.session_state.medications_data.append({
-                        "Patient": patient,
-                        "Medication": med_name,
-                        "Dosage": dosage,
-                        "Frequency": freq,
-                        "Status": "Active"
-                    })
-                    st.success(f"Prescription for {med_name} added successfully!")
-
-        st.divider()
-        st.subheader("📋 Active Prescriptions Table")
-        df_meds = pd.DataFrame(st.session_state.medications_data)
-        st.dataframe(df_meds, use_container_width=True)
-
-    # 4. Shift Handovers
+    # 5. Shift Handovers
     elif menu == "Shift Handovers":
         st.title("🔄 Shift Handover Documentation")
-        st.markdown("Log shift reports and ensure seamless clinical continuity between care staff.")
+        st.dataframe(pd.DataFrame(st.session_state.handovers_data), use_container_width=True)
 
-        with st.expander("📝 **Create Shift Handover Log**", expanded=True):
-            with st.form("handover_form", clear_on_submit=True):
-                outgoing = st.text_input("Outgoing Clinician / Caregiver", value=full_name)
-                incoming = st.text_input("Incoming Clinician / Caregiver")
-                p_select = st.selectbox("Target Patient", ["John Doe (Room 102)", "Mary Jane (Room 105)", "All Ward Patients"])
-                shift_notes = st.text_area("Key Updates, Incidents, or Care Plan Adjustments")
-                
-                submit_handover = st.form_submit_button("📋 Submit Shift Handover", use_container_width=True)
-                if submit_handover and shift_notes:
-                    st.session_state.handovers_data.insert(0, {
-                        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        "Outgoing Staff": outgoing,
-                        "Incoming Staff": incoming,
-                        "Patient": p_select,
-                        "Shift Notes": shift_notes
-                    })
-                    st.success("Shift handover log submitted successfully!")
-
-        st.divider()
-        st.subheader("📚 Handover History")
-        df_handovers = pd.DataFrame(st.session_state.handovers_data)
-        st.dataframe(df_handovers, use_container_width=True)
-
-    # 5. Emergency SOS Broadcast
+    # 6. Emergency SOS
     elif menu == "Emergency SOS":
         st.title("🚨 Emergency SOS Broadcast Hub")
-        st.markdown("Dispatch urgent alerts to on-call response teams and attending doctors.")
+        st.error("⚠️ Triggering an SOS will alert emergency care teams immediately.")
 
-        st.error("⚠️ **Warning:** Triggering an SOS will alert emergency care teams immediately.")
-        
-        with st.form("sos_form"):
-            sos_patient = st.selectbox("Select Patient in Distress", ["John Doe (Room 102)", "Mary Jane (Room 105)", "Robert Chen (Room 201)"])
-            sos_type = st.selectbox("Emergency Category", ["Cardiac Arrest / Vitals Collapse", "Severe Fall / Trauma", "Acute Respiratory Distress", "Unresponsive Patient"])
-            location = st.text_input("Location / Ward", value="Ward A - Room 102")
-            sos_notes = st.text_area("Emergency Context / Observations")
-            
-            trigger_sos = st.form_submit_button("🚨 BROADCAST EMERGENCY SOS ALERT", use_container_width=True)
-            if trigger_sos:
-                st.error(f"🚨 **EMERGENCY SOS DISPATCHED!** Alert broadcasted for **{sos_patient}** ({sos_type}) at {location}.")
-                st.info("📲 On-call physicians and attending nursing staff have been notified via automated broadcast.")
-
-    # 6. Admin Only: Intrusion Detection & Prevention System (IDPS)
+    # 7. Admin IDPS
     elif menu == "🛡️ Security Hub (IDPS)":
         st.title("🛡️ Admin Security Console (IDPS)")
-        st.markdown("Intrusion Detection and Prevention System & Staff Onboarding Hub.")
-
-        m1, m2, m3, m4 = st.columns(4)
-        with m1:
-            st.metric("Threats Blocked Today", "42", "+5 this hour")
-        with m2:
-            st.metric("SQLi Filters Active", "100%", "Enforced")
-        with m3:
-            st.metric("Brute-Force Lockouts", "3", "Active")
-        with m4:
-            st.metric("MFA Compliance Rate", "98.4%", "+0.5%")
-
-        st.divider()
-        
-        # Staff Invite Section (Option 3 Implementation)
-        st.subheader("✉️ Invite New Staff Member")
-        st.markdown("Dispatch an official login invitation to authorized medical staff.")
-
-        with st.form("invite_staff_form", clear_on_submit=True):
-            col_inv1, col_inv2 = st.columns(2)
-            with col_inv1:
-                invite_email = st.text_input("Staff Email Address", placeholder="doctor@hospital.org")
-                invite_name = st.text_input("Staff Full Name", placeholder="Dr. Jane Doe")
-            with col_inv2:
-                invite_role = st.selectbox("Assigned Clinical Role", ["Doctor", "Nurse", "Caregiver", "Admin"])
-                department = st.text_input("Department / Unit", placeholder="Cardiology - Ward B")
-
-            submit_invite = st.form_submit_button("📩 Send Official Invitation", use_container_width=True)
-
-            if submit_invite:
-                if invite_email and invite_name:
-                    try:
-                        admin_client = init_supabase_admin()
-                        if admin_client:
-                            # Send official Supabase invite link
-                            admin_client.auth.admin.invite_user_by_email(
-                                email=invite_email,
-                                options={
-                                    "data": {
-                                        "full_name": invite_name,
-                                        "role": invite_role.lower(),
-                                        "department": department
-                                    }
-                                }
-                            )
-                            st.success(f"Invitation successfully sent to **{invite_email}** with role `{invite_role}`!")
-                        else:
-                            st.info(f"✅ **[Invite Processed]** Invitation queued for **{invite_email}** (`{invite_role}`).\n\n*Note: To send real automated email invites, add `SUPABASE_SERVICE_ROLE_KEY` to your Streamlit secrets.*")
-                    except Exception as e:
-                        st.error(f"Failed to send invite: {e}")
-                else:
-                    st.warning("Please provide both an email address and full name.")
-
-        st.divider()
-        st.subheader("🚨 Live Security Incident Stream")
-        df_idps = pd.DataFrame(st.session_state.idps_logs)
-        st.dataframe(df_idps, use_container_width=True)
+        st.dataframe(pd.DataFrame(st.session_state.idps_logs), use_container_width=True)
 
 def main():
     if 'user' not in st.session_state or st.session_state['user'] is None:
