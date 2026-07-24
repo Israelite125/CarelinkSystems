@@ -86,7 +86,10 @@ def login_signup_portal():
 def main_dashboard():
     # Updated Sidebar Heading as requested
     st.sidebar.markdown("### 🩺 CareLink System")
-    st.sidebar.markdown(f"**Logged in as:** {st.session_state.get('user', {}).get('email', 'User')}")
+    user = st.session_state.get("user")
+user_email = getattr(user, "email", "User") if user else "User"
+
+st.sidebar.markdown(f"**Logged in as:** {user_email}")
     
     menu = st.sidebar.selectbox(
         "Navigation Menu", 
