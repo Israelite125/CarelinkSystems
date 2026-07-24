@@ -9,23 +9,21 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Load Credentials (Supports Streamlit Secrets or Fallback Strings)
-try:
-   SUPABASE_URL = "https://mkdvkaraqdjsxgxqjnhg.supabase.co/rest/v1"
+# Credentials defined directly
+SUPABASE_URL = "https://mkdvkaraqdjsxgxqjnhg.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rZHZrYXJhcWRqc3hneHFqbmhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NDgwMzMsImV4cCI6MjEwMDEyNDAzM30.bKkl_O1FtV1iMkbFsTKF06W8hOTpRYQbt7fpFdkGGaI"
-
-except Exception:
-    SUPABASE_URL = "YOUR_SUPABASE_URL"
-    SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY"
 
 @st.cache_resource
 def init_supabase():
-    # Sanitize URL to prevent path errors
     clean_url = (
         SUPABASE_URL.strip()
         .rstrip("/")
         .replace("/rest/v1", "")
         .replace("/auth/v1", "")
+    )
+    return create_client(clean_url, SUPABASE_KEY)
+
+supabase = init_supabase()
     )
     return create_client(clean_url, SUPABASE_KEY)
 
