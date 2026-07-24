@@ -186,7 +186,7 @@ def login_signup_portal():
                             supabase.auth.sign_in_with_otp({
                                 "email": email,
                                 "options": {
-                                    "should_create_user": False
+                                    "should_create_user": True
                                 }
                             })
                             
