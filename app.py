@@ -19,46 +19,18 @@ if "theme_mode" not in st.session_state:
 if "Dark" in st.session_state.theme_mode:
     st.markdown("""
         <style>
-        .stApp {
-            background-color: #0f172a;
-            color: #f8fafc;
-        }
-        div[data-testid="stSidebar"] {
-            background-color: #1e293b;
-        }
-        div[data-testid="stForm"] {
-            background-color: #1e293b;
-            border: 1px solid #334155;
-            padding: 20px;
-            border-radius: 10px;
-        }
-        .metric-card {
-            background-color: #1e293b;
-            border: 1px solid #334155;
-            padding: 15px;
-            border-radius: 8px;
-        }
+        .stApp { background-color: #0f172a; color: #f8fafc; }
+        div[data-testid="stSidebar"] { background-color: #1e293b; }
+        div[data-testid="stForm"] { background-color: #1e293b; border: 1px solid #334155; padding: 20px; border-radius: 10px; }
+        .metric-card { background-color: #1e293b; border: 1px solid #334155; padding: 15px; border-radius: 8px; }
         </style>
     """, unsafe_allow_html=True)
 else:
     st.markdown("""
         <style>
-        .stApp {
-            background-color: #f8fafc;
-            color: #0f172a;
-        }
-        div[data-testid="stForm"] {
-            background-color: #ffffff;
-            border: 1px solid #e2e8f0;
-            padding: 20px;
-            border-radius: 10px;
-        }
-        .metric-card {
-            background-color: #ffffff;
-            border: 1px solid #e2e8f0;
-            padding: 15px;
-            border-radius: 8px;
-        }
+        .stApp { background-color: #f8fafc; color: #0f172a; }
+        div[data-testid="stForm"] { background-color: #ffffff; border: 1px solid #e2e8f0; padding: 20px; border-radius: 10px; }
+        .metric-card { background-color: #ffffff; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -77,7 +49,7 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Initialize Local Session Memory for Clinical Data
+# Initialize Session Data
 if "vitals_data" not in st.session_state:
     st.session_state.vitals_data = [
         {"Timestamp": "2026-07-24 10:30", "Patient": "John Doe (Room 102)", "Heart Rate (BPM)": 78, "Blood Pressure": "120/80", "Temp (°C)": 36.8, "SpO2 (%)": 98, "Logged By": "Dr. Smith"},
@@ -93,6 +65,14 @@ if "medications_data" not in st.session_state:
 if "handovers_data" not in st.session_state:
     st.session_state.handovers_data = [
         {"Timestamp": "2026-07-24 08:00", "Outgoing Staff": "Nurse Sarah", "Incoming Staff": "Nurse David", "Patient": "John Doe", "Shift Notes": "Patient slept well. Morning vitals stable."}
+    ]
+
+# IDPS Security Incident Logs
+if "idps_logs" not in st.session_state:
+    st.session_state.idps_logs = [
+        {"Timestamp": "2026-07-24 09:12:04", "IP Address": "192.168.1.104", "Event Type": "Brute Force Attempt", "Severity": "High", "Action Taken": "IP Blocked (15m)"},
+        {"Timestamp": "2026-07-24 08:45:12", "IP Address": "10.0.0.12", "Event Type": "SQLi Pattern Detected", "Severity": "Critical", "Action Taken": "Request Sanitized & Dropped"},
+        {"Timestamp": "2026-07-24 07:30:00", "IP Address": "192.168.1.50", "Event Type": "MFA Auth Success", "Severity": "Low", "Action Taken": "Session Initialized"}
     ]
 
 def login_signup_portal():
@@ -152,10 +132,16 @@ def main_dashboard():
     # Sidebar Header
     st.sidebar.markdown("### 🩺 CareLink System")
     
-    # Safe User Email Extraction
+    # Safe User & Metadata Extraction
     user = st.session_state.get("user")
     user_email = getattr(user, "email", "User") if user else "User"
+    
+    # Extract Role safely from Supabase user_metadata (default to 'clinician')
+    user_metadata = getattr(user, "user_metadata", {}) or {}
+    user_role = user_metadata.get("role", "clinician").lower()
+    
     st.sidebar.markdown(f"**Logged in as:** `{user_email}`")
+    st.sidebar.caption(f"🛡️ **Role:** `{user_role.upper()}`")
     st.sidebar.divider()
     
     # Theme Selector
@@ -171,10 +157,20 @@ def main_dashboard():
 
     st.sidebar.divider()
     
-    menu = st.sidebar.radio(
-        "Navigation Menu", 
-        ["Dashboard Overview", "Vitals Logs", "Medication & Prescriptions", "Shift Handovers", "Emergency SOS"]
-    )
+    # RBAC Dynamic Navigation Menu
+    menu_options = [
+        "Dashboard Overview", 
+        "Vitals Logs", 
+        "Medication & Prescriptions", 
+        "Shift Handovers", 
+        "Emergency SOS"
+    ]
+    
+    # Add IDPS only if user role is admin
+    if user_role == "admin":
+        menu_options.append("🛡️ Security Hub (IDPS)")
+    
+    menu = st.sidebar.radio("Navigation Menu", menu_options)
     
     st.sidebar.divider()
     if st.sidebar.button("🚪 Sign Out", use_container_width=True):
@@ -205,7 +201,7 @@ def main_dashboard():
         st.warning("⚠️ **Mary Jane (Room 105):** Elevated Heart Rate (105 BPM) & Temp (38.2 °C) logged at 11:15 AM.")
         st.info("ℹ️ **John Doe (Room 102):** Scheduled for afternoon vitals check at 14:00.")
 
-    # 2. Vitals Logs (Interactive Form)
+    # 2. Vitals Logs
     elif menu == "Vitals Logs":
         st.title("🫀 Patient Vitals Tracker")
         st.markdown("Record and track real-time physiological metrics for active patients.")
@@ -319,6 +315,26 @@ def main_dashboard():
             if trigger_sos:
                 st.error(f"🚨 **EMERGENCY SOS DISPATCHED!** Alert broadcasted for **{sos_patient}** ({sos_type}) at {location}.")
                 st.info("📲 On-call physicians and attending nursing staff have been notified via automated broadcast.")
+
+    # 6. Admin Only: Intrusion Detection & Prevention System (IDPS)
+    elif menu == "🛡️ Security Hub (IDPS)":
+        st.title("🛡️ Admin Security Console (IDPS)")
+        st.markdown("Intrusion Detection and Prevention System metrics, threat logs, and network security.")
+
+        m1, m2, m3, m4 = st.columns(4)
+        with m1:
+            st.metric("Threats Blocked Today", "42", "+5 this hour")
+        with m2:
+            st.metric("SQLi Filters Active", "100%", "Enforced")
+        with m3:
+            st.metric("Brute-Force Lockouts", "3", "Active")
+        with m4:
+            st.metric("MFA Compliance Rate", "98.4%", "+0.5%")
+
+        st.divider()
+        st.subheader("🚨 Live Security Incident Stream")
+        df_idps = pd.DataFrame(st.session_state.idps_logs)
+        st.dataframe(df_idps, use_container_width=True)
 
 def main():
     if 'user' not in st.session_state or st.session_state['user'] is None:
