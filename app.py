@@ -9,13 +9,18 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize Supabase Client (Replace with your actual Supabase URL and Anon Key)
-SUPABASE_URL = "https://mkdvkaraqdjsxgxqjnhg.supabase.co/rest/v1"
+# Load Credentials (Supports Streamlit Secrets or Fallback Strings)
+try:
+   SUPABASE_URL = "https://mkdvkaraqdjsxgxqjnhg.supabase.co/rest/v1"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rZHZrYXJhcWRqc3hneHFqbmhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NDgwMzMsImV4cCI6MjEwMDEyNDAzM30.bKkl_O1FtV1iMkbFsTKF06W8hOTpRYQbt7fpFdkGGaI"
+
+except Exception:
+    SUPABASE_URL = "YOUR_SUPABASE_URL"
+    SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY"
 
 @st.cache_resource
 def init_supabase():
-    # Sanitize the URL by removing trailing slashes and common subpaths
+    # Sanitize URL to prevent path errors
     clean_url = (
         SUPABASE_URL.strip()
         .rstrip("/")
@@ -39,7 +44,7 @@ def login_signup_portal():
         if st.button("Send 6-Digit OTP Code"):
             if email:
                 try:
-                    response = supabase.auth.sign_in_with_otp({
+                    supabase.auth.sign_in_with_otp({
                         "email": email,
                         "options": {
                             "should_create_user": True
@@ -129,3 +134,12 @@ def main_dashboard():
     elif menu == "Emergency SOS":
         st.title("Emergency SOS Broadcast")
         st.error("Trigger instant alerts and notifications to designated emergency responders and caregivers.")
+
+def main():
+    if 'user' not in st.session_state or st.session_state['user'] is None:
+        login_signup_portal()
+    else:
+        main_dashboard()
+
+if __name__ == "__main__":
+    main()
