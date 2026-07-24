@@ -17,7 +17,7 @@ st.set_page_config(
 if "theme_mode" not in st.session_state:
     st.session_state.theme_mode = "Light Mode ☀️"
 
-# Dynamic Theme Injection
+# Dynamic Theme Injection for Main Dashboard
 if "Dark" in st.session_state.theme_mode:
     st.markdown("""
         <style>
@@ -36,7 +36,7 @@ else:
         </style>
     """, unsafe_allow_html=True)
 
-# Credentials (Streamlit Secrets with Fallback)
+# Supabase Credentials (Streamlit Secrets with Fallback)
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
@@ -45,7 +45,6 @@ except Exception:
     SUPABASE_URL = "https://mkdvkaraqdjsxgxqjnhg.supabase.co"
     SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rZHZrYXJhcWRqc3hneHFqbmhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NDgwMzMsImV4cCI6MjEwMDEyNDAzM30.bKkl_O1FtV1iMkbFsTKF06W8hOTpRYQbt7fpFdkGGaI"
     SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rZHZrYXJhcWRqc3hneHFqbmhnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDU0ODAzMywiZXhwIjoyMTAwMTI0MDMzfQ.IZgi6bai-Rr9hveCYRoHOkwL9n3VpqPwrIPa27hW0TY"
-
 @st.cache_resource
 def init_supabase():
     clean_url = SUPABASE_URL.strip().rstrip("/").replace("/rest/v1", "").replace("/auth/v1", "")
@@ -91,15 +90,102 @@ if "idps_logs" not in st.session_state:
         {"Timestamp": "2026-07-24 08:45:12", "IP Address": "10.0.0.12", "Event Type": "SQLi Pattern Detected", "Severity": "Critical", "Action Taken": "Request Sanitized & Dropped"}
     ]
 
+# Animated Pasiflora AI Style Portal
 def login_signup_portal():
-    st.markdown("<h1 style='text-align: center; color: #2563eb;'>🩺 CareLink Portal</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>Secure Healthcare Access for Staff & Patients</p>", unsafe_allow_html=True)
+    # Inject Pasiflora AI-Inspired Dark Ambient Animation & Glassmorphism
+    st.markdown("""
+        <style>
+        /* Dark Navy Deep Background */
+        [data-testid="stAppViewContainer"] {
+            background-color: #0d1117 !important;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Glowing Radial Background Orbs */
+        [data-testid="stAppViewContainer"]::before {
+            content: "";
+            position: absolute;
+            width: 550px;
+            height: 550px;
+            top: -120px;
+            left: 15%;
+            background: radial-gradient(circle, rgba(168, 85, 247, 0.35) 0%, rgba(13, 17, 23, 0) 70%);
+            filter: blur(70px);
+            animation: pulseGlow 8s ease-in-out infinite alternate;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        [data-testid="stAppViewContainer"]::after {
+            content: "";
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            bottom: -80px;
+            right: 15%;
+            background: radial-gradient(circle, rgba(2, 213, 238, 0.25) 0%, rgba(13, 17, 23, 0) 70%);
+            filter: blur(80px);
+            animation: pulseGlow 10s ease-in-out infinite alternate-reverse;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        @keyframes pulseGlow {
+            0% { transform: scale(0.9) translateY(0px); opacity: 0.6; }
+            100% { transform: scale(1.15) translateY(-25px); opacity: 0.85; }
+        }
+
+        /* Pasiflora Dark Frosted Glass Card */
+        div[data-testid="stForm"] {
+            background: rgba(18, 22, 26, 0.85) !important;
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-radius: 16px !important;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+            z-index: 1;
+        }
+
+        /* Input Field Dark Styling */
+        div[data-baseweb="input"] {
+            background-color: #16191f !important;
+            border: 1px solid #2a303c !important;
+            border-radius: 8px !important;
+            color: #ffffff !important;
+        }
+
+        /* Text Adjustments */
+        .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp label, .stApp span {
+            color: #f8fafc !important;
+        }
+
+        /* Pasiflora Gradient Purple Button */
+        div.stButton > button {
+            background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%) !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 8px !important;
+            font-weight: 600 !important;
+            box-shadow: 0 4px 14px rgba(168, 85, 247, 0.35);
+            transition: all 0.2s ease-in-out;
+        }
+
+        div.stButton > button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(168, 85, 247, 0.55);
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<h1 style='text-align: center; color: #a855f7;'>🩺 CareLink Portal</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #94a3b8;'>Secure Access for Medical Staff & Patients</p>", unsafe_allow_html=True)
     
     tab1, tab2, tab3 = st.tabs(["👨‍⚕️ Clinical Staff Sign In", "🏥 Patient Registration", "🔒 Access Info"])
     
-    # 1. Staff Login
+    # 1. Staff Sign In (Option 3: Invite-Only)
     with tab1:
-        st.subheader("Invited Staff OTP Sign In")
+        st.subheader("Invited Staff Sign In")
         email = st.text_input("Staff Email Address", key="staff_signin_email", placeholder="doctor@hospital.org")
         
         if st.button("Send 6-Digit OTP Code", key="btn_staff_otp", use_container_width=True):
@@ -111,7 +197,7 @@ def login_signup_portal():
                     })
                     st.success("Verification code sent to your email inbox!")
                 except Exception as e:
-                    st.error("Access Denied: Unregistered staff email. Contact your admin for an invitation.")
+                    st.error("Access Denied: Unregistered staff email. Contact your administrator for an invitation.")
             else:
                 st.warning("Please enter your registered staff email.")
         
@@ -128,7 +214,7 @@ def login_signup_portal():
                 except Exception as e:
                     st.error(f"Invalid or expired OTP: {e}")
 
-    # 2. Patient Registration via Access Code
+    # 2. Patient Sign Up (Pattern 1: Access Code)
     with tab2:
         st.subheader("Activate Patient Access")
         st.caption("Enter the 6-digit Patient Access Code printed on your intake document or wristband.")
@@ -141,7 +227,6 @@ def login_signup_portal():
                 if access_code in st.session_state.patient_access_codes:
                     linked_patient = st.session_state.patient_access_codes[access_code]
                     try:
-                        # Register patient with linked metadata
                         supabase.auth.sign_in_with_otp({
                             "email": p_email,
                             "options": {
@@ -174,7 +259,7 @@ def login_signup_portal():
                 except Exception as e:
                     st.error(f"Invalid OTP code: {e}")
 
-    # 3. Access Policy Info
+    # 3. Access Info
     with tab3:
         st.subheader("Security & Privacy Guidelines")
         st.info("🔒 CareLink enforces strict role isolation. Staff require administrator invitations, while patients require verified wristband access codes issued during hospital intake.")
@@ -204,7 +289,6 @@ def patient_dashboard(user, user_metadata):
 
     with p_menu[0]:
         st.subheader("Your Latest Health Metrics")
-        # Filter vitals strictly for this patient
         my_vitals = [v for v in st.session_state.vitals_data if v["Patient"] == linked_patient]
         if my_vitals:
             df_my_vitals = pd.DataFrame(my_vitals)
@@ -214,7 +298,6 @@ def patient_dashboard(user, user_metadata):
 
     with p_menu[1]:
         st.subheader("Your Active Prescriptions")
-        # Filter medications strictly for this patient
         my_meds = [m for m in st.session_state.medications_data if m["Patient"] == linked_patient]
         if my_meds:
             df_my_meds = pd.DataFrame(my_meds)
@@ -228,7 +311,7 @@ def patient_dashboard(user, user_metadata):
         if st.button("🔔 CALL ATTENDING NURSE NOW", use_container_width=True):
             st.success(f"Notification sent to the nursing station for {linked_patient}!")
 
-# Main Clinical & Staff Dashboard
+# Main Clinical Workspace (Staff & Admins)
 def main_dashboard():
     user = st.session_state.get("user")
     user_metadata = getattr(user, "user_metadata", {}) or {}
@@ -303,7 +386,7 @@ def main_dashboard():
         st.subheader("📋 Recent Clinical Alerts")
         st.warning("⚠️ **Mary Jane (Room 105):** Elevated Heart Rate (105 BPM) & Temp (38.2 °C) logged at 11:15 AM.")
 
-    # 2. Patient Access Codes (Clinician Issue Hub)
+    # 2. Patient Access Codes (Clinician Issuer)
     elif menu == "Patient Access Codes":
         st.title("🎫 Patient Intake & Access Code Issuer")
         st.markdown("Generate secure access codes to grant patients portal access.")
@@ -377,9 +460,59 @@ def main_dashboard():
         st.title("🚨 Emergency SOS Broadcast Hub")
         st.error("⚠️ Triggering an SOS will alert emergency care teams immediately.")
 
-    # 7. Admin IDPS
+    # 7. Admin Security Hub (IDPS)
     elif menu == "🛡️ Security Hub (IDPS)":
         st.title("🛡️ Admin Security Console (IDPS)")
+        
+        m1, m2, m3, m4 = st.columns(4)
+        with m1:
+            st.metric("Threats Blocked Today", "42", "+5 this hour")
+        with m2:
+            st.metric("SQLi Filters Active", "100%", "Enforced")
+        with m3:
+            st.metric("Brute-Force Lockouts", "3", "Active")
+        with m4:
+            st.metric("MFA Compliance Rate", "98.4%", "+0.5%")
+
+        st.divider()
+        st.subheader("✉️ Invite New Staff Member")
+
+        with st.form("invite_staff_form", clear_on_submit=True):
+            col_inv1, col_inv2 = st.columns(2)
+            with col_inv1:
+                invite_email = st.text_input("Staff Email Address", placeholder="doctor@hospital.org")
+                invite_name = st.text_input("Staff Full Name", placeholder="Dr. Jane Doe")
+            with col_inv2:
+                invite_role = st.selectbox("Assigned Clinical Role", ["Doctor", "Nurse", "Caregiver", "Admin"])
+                department = st.text_input("Department / Unit", placeholder="Cardiology - Ward B")
+
+            submit_invite = st.form_submit_button("📩 Send Official Invitation", use_container_width=True)
+
+            if submit_invite:
+                if invite_email and invite_name:
+                    try:
+                        admin_client = init_supabase_admin()
+                        if admin_client:
+                            admin_client.auth.admin.invite_user_by_email(
+                                email=invite_email,
+                                options={
+                                    "data": {
+                                        "full_name": invite_name,
+                                        "role": invite_role.lower(),
+                                        "department": department
+                                    }
+                                }
+                            )
+                            st.success(f"Invitation successfully sent to **{invite_email}** with role `{invite_role}`!")
+                        else:
+                            st.info(f"✅ **[Invite Processed]** Invitation queued for **{invite_email}** (`{invite_role}`).\n\n*Note: To send real automated email invites, add `SUPABASE_SERVICE_ROLE_KEY` to your Streamlit secrets.*")
+                    except Exception as e:
+                        st.error(f"Failed to send invite: {e}")
+                else:
+                    st.warning("Please provide both an email address and full name.")
+
+        st.divider()
+        st.subheader("🚨 Live Security Incident Stream")
         st.dataframe(pd.DataFrame(st.session_state.idps_logs), use_container_width=True)
 
 def main():
