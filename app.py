@@ -45,6 +45,7 @@ except Exception:
     SUPABASE_URL = "https://mkdvkaraqdjsxgxqjnhg.supabase.co"
     SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rZHZrYXJhcWRqc3hneHFqbmhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NDgwMzMsImV4cCI6MjEwMDEyNDAzM30.bKkl_O1FtV1iMkbFsTKF06W8hOTpRYQbt7fpFdkGGaI"
     SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rZHZrYXJhcWRqc3hneHFqbmhnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDU0ODAzMywiZXhwIjoyMTAwMTI0MDMzfQ.IZgi6bai-Rr9hveCYRoHOkwL9n3VpqPwrIPa27hW0TY"
+
 @st.cache_resource
 def init_supabase():
     clean_url = SUPABASE_URL.strip().rstrip("/").replace("/rest/v1", "").replace("/auth/v1", "")
@@ -59,84 +60,152 @@ def init_supabase_admin():
 
 supabase = init_supabase()
 
-# Initialize Patient Access Codes Store
-if "patient_access_codes" not in st.session_state:
-    st.session_state.patient_access_codes = {
+# --- DATABASE HELPER FUNCTIONS ---
+
+def fetch_patient_access_codes():
+    """Fetch patient access codes from Supabase table."""
+    try:
+        response = supabase.table("patient_access_codes").select("*").execute()
+        if response.data:
+            return {item["access_code"]: item["patient_label"] for item in response.data}
+    except Exception:
+        pass
+    return {
         "PAT-1020": "John Doe (Room 102)",
         "PAT-1050": "Mary Jane (Room 105)"
     }
 
-# Initialize Clinical Data
-if "vitals_data" not in st.session_state:
-    st.session_state.vitals_data = [
+def save_patient_access_code(code: str, label: str):
+    """Save new access code to Supabase table."""
+    try:
+        supabase.table("patient_access_codes").insert({
+            "access_code": code,
+            "patient_label": label
+        }).execute()
+    except Exception as e:
+        st.error(f"Error saving access code to database: {e}")
+
+def fetch_vitals_data():
+    """Fetch recorded vitals from Supabase table."""
+    try:
+        response = supabase.table("vitals_data").select("*").order("created_at", desc=True).execute()
+        if response.data:
+            return [
+                {
+                    "Timestamp": row["timestamp"],
+                    "Patient": row["patient"],
+                    "Heart Rate (BPM)": row["heart_rate"],
+                    "Blood Pressure": row["bp"],
+                    "Temp (°C)": row["temperature"],
+                    "SpO2 (%)": row["spo2"],
+                    "Logged By": row["logged_by"]
+                }
+                for row in response.data
+            ]
+    except Exception:
+        pass
+    return [
         {"Timestamp": "2026-07-24 10:30", "Patient": "John Doe (Room 102)", "Heart Rate (BPM)": 78, "Blood Pressure": "120/80", "Temp (°C)": 36.8, "SpO2 (%)": 98, "Logged By": "Dr. Smith"},
         {"Timestamp": "2026-07-24 11:15", "Patient": "Mary Jane (Room 105)", "Heart Rate (BPM)": 105, "Blood Pressure": "138/88", "Temp (°C)": 38.2, "SpO2 (%)": 94, "Logged By": "Nurse Sarah"}
     ]
 
-if "medications_data" not in st.session_state:
-    st.session_state.medications_data = [
+def save_vitals_data(entry: dict):
+    """Save new vitals record to Supabase table."""
+    try:
+        supabase.table("vitals_data").insert({
+            "timestamp": entry["Timestamp"],
+            "patient": entry["Patient"],
+            "heart_rate": entry["Heart Rate (BPM)"],
+            "bp": entry["Blood Pressure"],
+            "temperature": entry["Temp (°C)"],
+            "spo2": entry["SpO2 (%)"],
+            "logged_by": entry["Logged By"]
+        }).execute()
+    except Exception as e:
+        st.error(f"Error saving vitals record to database: {e}")
+
+def fetch_medications_data():
+    """Fetch active prescriptions from Supabase table."""
+    try:
+        response = supabase.table("medications_data").select("*").execute()
+        if response.data:
+            return [
+                {
+                    "Patient": row["patient"],
+                    "Medication": row["medication"],
+                    "Dosage": row["dosage"],
+                    "Frequency": row["frequency"],
+                    "Status": row["status"]
+                }
+                for row in response.data
+            ]
+    except Exception:
+        pass
+    return [
         {"Patient": "John Doe (Room 102)", "Medication": "Amoxicillin", "Dosage": "500mg", "Frequency": "Twice Daily", "Status": "Active"},
         {"Patient": "Mary Jane (Room 105)", "Medication": "Lisinopril", "Dosage": "10mg", "Frequency": "Once Daily", "Status": "Refill Needed"}
     ]
 
-if "handovers_data" not in st.session_state:
-    st.session_state.handovers_data = [
+def fetch_handovers_data():
+    """Fetch shift handovers from Supabase table."""
+    try:
+        response = supabase.table("shift_handovers").select("*").order("created_at", desc=True).execute()
+        if response.data:
+            return [
+                {
+                    "Timestamp": row["timestamp"],
+                    "Outgoing Staff": row["outgoing_staff"],
+                    "Incoming Staff": row["incoming_staff"],
+                    "Patient": row["patient"],
+                    "Shift Notes": row["shift_notes"]
+                }
+                for row in response.data
+            ]
+    except Exception:
+        pass
+    return [
         {"Timestamp": "2026-07-24 08:00", "Outgoing Staff": "Nurse Sarah", "Incoming Staff": "Nurse David", "Patient": "John Doe", "Shift Notes": "Patient slept well. Morning vitals stable."}
     ]
 
-if "idps_logs" not in st.session_state:
-    st.session_state.idps_logs = [
-        {"Timestamp": "2026-07-24 09:12:04", "IP Address": "192.168.1.104", "Event Type": "Uninvited Login Attempt", "Severity": "Medium", "Action Taken": "Access Denied"},
-        {"Timestamp": "2026-07-24 08:45:12", "IP Address": "10.0.0.12", "Event Type": "SQLi Pattern Detected", "Severity": "Critical", "Action Taken": "Request Sanitized & Dropped"}
-    ]
+# Static Security Logs
+IDPS_LOGS = [
+    {"Timestamp": "2026-07-24 09:12:04", "IP Address": "192.168.1.104", "Event Type": "Uninvited Login Attempt", "Severity": "Medium", "Action Taken": "Access Denied"},
+    {"Timestamp": "2026-07-24 08:45:12", "IP Address": "10.0.0.12", "Event Type": "SQLi Pattern Detected", "Severity": "Critical", "Action Taken": "Request Sanitized & Dropped"}
+]
 
 # Animated Pasiflora AI Style Portal
 def login_signup_portal():
-    # Inject Pasiflora AI-Inspired Dark Ambient Animation & Glassmorphism
     st.markdown("""
         <style>
-        /* Dark Navy Deep Background */
         [data-testid="stAppViewContainer"] {
             background-color: #0d1117 !important;
             position: relative;
             overflow: hidden;
         }
-
-        /* Glowing Radial Background Orbs */
         [data-testid="stAppViewContainer"]::before {
             content: "";
             position: absolute;
-            width: 550px;
-            height: 550px;
-            top: -120px;
-            left: 15%;
+            width: 550px; height: 550px;
+            top: -120px; left: 15%;
             background: radial-gradient(circle, rgba(168, 85, 247, 0.35) 0%, rgba(13, 17, 23, 0) 70%);
             filter: blur(70px);
             animation: pulseGlow 8s ease-in-out infinite alternate;
-            z-index: 0;
-            pointer-events: none;
+            z-index: 0; pointer-events: none;
         }
-
         [data-testid="stAppViewContainer"]::after {
             content: "";
             position: absolute;
-            width: 500px;
-            height: 500px;
-            bottom: -80px;
-            right: 15%;
+            width: 500px; height: 500px;
+            bottom: -80px; right: 15%;
             background: radial-gradient(circle, rgba(2, 213, 238, 0.25) 0%, rgba(13, 17, 23, 0) 70%);
             filter: blur(80px);
             animation: pulseGlow 10s ease-in-out infinite alternate-reverse;
-            z-index: 0;
-            pointer-events: none;
+            z-index: 0; pointer-events: none;
         }
-
         @keyframes pulseGlow {
             0% { transform: scale(0.9) translateY(0px); opacity: 0.6; }
             100% { transform: scale(1.15) translateY(-25px); opacity: 0.85; }
         }
-
-        /* Pasiflora Dark Frosted Glass Card */
         div[data-testid="stForm"] {
             background: rgba(18, 22, 26, 0.85) !important;
             backdrop-filter: blur(18px);
@@ -146,21 +215,15 @@ def login_signup_portal():
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
             z-index: 1;
         }
-
-        /* Input Field Dark Styling */
         div[data-baseweb="input"] {
             background-color: #16191f !important;
             border: 1px solid #2a303c !important;
             border-radius: 8px !important;
             color: #ffffff !important;
         }
-
-        /* Text Adjustments */
         .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp label, .stApp span {
             color: #f8fafc !important;
         }
-
-        /* Pasiflora Gradient Purple Button */
         div.stButton > button {
             background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%) !important;
             color: white !important;
@@ -170,7 +233,6 @@ def login_signup_portal():
             box-shadow: 0 4px 14px rgba(168, 85, 247, 0.35);
             transition: all 0.2s ease-in-out;
         }
-
         div.stButton > button:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(168, 85, 247, 0.55);
@@ -183,7 +245,7 @@ def login_signup_portal():
     
     tab1, tab2, tab3 = st.tabs(["👨‍⚕️ Clinical Staff Sign In", "🏥 Patient Registration", "🔒 Access Info"])
     
-    # 1. Staff Sign In (Option 3: Invite-Only)
+    # 1. Staff Sign In
     with tab1:
         st.subheader("Invited Staff Sign In")
         email = st.text_input("Staff Email Address", key="staff_signin_email", placeholder="doctor@hospital.org")
@@ -196,7 +258,7 @@ def login_signup_portal():
                         "options": {"should_create_user": False}
                     })
                     st.success("Verification code sent to your email inbox!")
-                except Exception as e:
+                except Exception:
                     st.error("Access Denied: Unregistered staff email. Contact your administrator for an invitation.")
             else:
                 st.warning("Please enter your registered staff email.")
@@ -214,7 +276,7 @@ def login_signup_portal():
                 except Exception as e:
                     st.error(f"Invalid or expired OTP: {e}")
 
-    # 2. Patient Sign Up (Pattern 1: Access Code)
+    # 2. Patient Registration
     with tab2:
         st.subheader("Activate Patient Access")
         st.caption("Enter the 6-digit Patient Access Code printed on your intake document or wristband.")
@@ -222,10 +284,12 @@ def login_signup_portal():
         p_email = st.text_input("Patient / Family Email Address", key="pat_email")
         access_code = st.text_input("Patient Access Code", key="pat_code", placeholder="PAT-1020").strip().upper()
         
+        active_codes = fetch_patient_access_codes()
+
         if st.button("Activate Account & Send OTP", key="btn_pat_reg", use_container_width=True):
             if p_email and access_code:
-                if access_code in st.session_state.patient_access_codes:
-                    linked_patient = st.session_state.patient_access_codes[access_code]
+                if access_code in active_codes:
+                    linked_patient = active_codes[access_code]
                     try:
                         supabase.auth.sign_in_with_otp({
                             "email": p_email,
@@ -264,7 +328,7 @@ def login_signup_portal():
         st.subheader("Security & Privacy Guidelines")
         st.info("🔒 CareLink enforces strict role isolation. Staff require administrator invitations, while patients require verified wristband access codes issued during hospital intake.")
 
-# Patient Restricted View
+# Patient Restricted Dashboard
 def patient_dashboard(user, user_metadata):
     full_name = user_metadata.get("full_name", "Patient")
     linked_patient = user_metadata.get("linked_patient", "")
@@ -287,9 +351,12 @@ def patient_dashboard(user, user_metadata):
 
     p_menu = st.tabs(["🫀 My Vitals History", "💊 My Prescriptions", "🚨 Request Assistance"])
 
+    all_vitals = fetch_vitals_data()
+    all_meds = fetch_medications_data()
+
     with p_menu[0]:
         st.subheader("Your Latest Health Metrics")
-        my_vitals = [v for v in st.session_state.vitals_data if v["Patient"] == linked_patient]
+        my_vitals = [v for v in all_vitals if v["Patient"] == linked_patient]
         if my_vitals:
             df_my_vitals = pd.DataFrame(my_vitals)
             st.dataframe(df_my_vitals[["Timestamp", "Heart Rate (BPM)", "Blood Pressure", "Temp (°C)", "SpO2 (%)"]], use_container_width=True)
@@ -298,7 +365,7 @@ def patient_dashboard(user, user_metadata):
 
     with p_menu[1]:
         st.subheader("Your Active Prescriptions")
-        my_meds = [m for m in st.session_state.medications_data if m["Patient"] == linked_patient]
+        my_meds = [m for m in all_meds if m["Patient"] == linked_patient]
         if my_meds:
             df_my_meds = pd.DataFrame(my_meds)
             st.dataframe(df_my_meds[["Medication", "Dosage", "Frequency", "Status"]], use_container_width=True)
@@ -311,26 +378,23 @@ def patient_dashboard(user, user_metadata):
         if st.button("🔔 CALL ATTENDING NURSE NOW", use_container_width=True):
             st.success(f"Notification sent to the nursing station for {linked_patient}!")
 
-# Main Clinical Workspace (Staff & Admins)
+# Main Clinical Workspace
 def main_dashboard():
     user = st.session_state.get("user")
     user_metadata = getattr(user, "user_metadata", {}) or {}
     user_role = user_metadata.get("role", "doctor").lower()
     
-    # Route Patient accounts to the restricted Patient Portal
     if user_role == "patient":
         patient_dashboard(user, user_metadata)
         return
 
     full_name = user_metadata.get("full_name", getattr(user, "email", "Staff"))
 
-    # Sidebar Header
     st.sidebar.markdown("### 🩺 CareLink System")
     st.sidebar.markdown(f"**Staff:** `{full_name}`")
     st.sidebar.caption(f"🛡️ **Role:** `{user_role.upper()}`")
     st.sidebar.divider()
     
-    # Theme Selector
     selected_theme = st.sidebar.radio(
         "🎨 Interface Theme",
         ["Light Mode ☀️", "Dark Mode 🌙"],
@@ -343,7 +407,6 @@ def main_dashboard():
 
     st.sidebar.divider()
     
-    # Navigation Options
     menu_options = [
         "Dashboard Overview", 
         "Patient Access Codes",
@@ -372,13 +435,15 @@ def main_dashboard():
         st.title("🏥 Clinical Workspace Overview")
         st.markdown(f"Welcome back, **{full_name}**.")
         
+        vitals_list = fetch_vitals_data()
+        
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("Active Patients", "14", "+2 today")
         with col2:
             st.metric("Pending Refills", "3", "Action Required", delta_color="inverse")
         with col3:
-            st.metric("Vitals Recorded Today", len(st.session_state.vitals_data), "+1 this hour")
+            st.metric("Vitals Recorded Today", len(vitals_list), "+1 this hour")
         with col4:
             st.metric("System Status", "Secure & Online", "100%")
 
@@ -386,7 +451,7 @@ def main_dashboard():
         st.subheader("📋 Recent Clinical Alerts")
         st.warning("⚠️ **Mary Jane (Room 105):** Elevated Heart Rate (105 BPM) & Temp (38.2 °C) logged at 11:15 AM.")
 
-    # 2. Patient Access Codes (Clinician Issuer)
+    # 2. Patient Access Codes
     elif menu == "Patient Access Codes":
         st.title("🎫 Patient Intake & Access Code Issuer")
         st.markdown("Generate secure access codes to grant patients portal access.")
@@ -403,12 +468,13 @@ def main_dashboard():
             if submit_gen_code and p_name_input:
                 new_code = f"PAT-{''.join(random.choices(string.digits, k=4))}"
                 patient_label = f"{p_name_input} ({p_room_input})" if p_room_input else p_name_input
-                st.session_state.patient_access_codes[new_code] = patient_label
-                st.success(f"Access Code **`{new_code}`** generated for **{patient_label}**!")
+                save_patient_access_code(new_code, patient_label)
+                st.success(f"Access Code **`{new_code}`** generated and saved to database for **{patient_label}**!")
 
         st.divider()
         st.subheader("📋 Active Patient Access Codes")
-        df_codes = pd.DataFrame([{"Access Code": k, "Linked Patient Record": v} for k, v in st.session_state.patient_access_codes.items()])
+        codes_dict = fetch_patient_access_codes()
+        df_codes = pd.DataFrame([{"Access Code": k, "Linked Patient Record": v} for k, v in codes_dict.items()])
         st.dataframe(df_codes, use_container_width=True)
 
     # 3. Vitals Logs
@@ -439,21 +505,21 @@ def main_dashboard():
                         "SpO2 (%)": spo2,
                         "Logged By": full_name
                     }
-                    st.session_state.vitals_data.insert(0, new_entry)
-                    st.success(f"Vitals successfully saved for {patient_name}!")
+                    save_vitals_data(new_entry)
+                    st.success(f"Vitals successfully saved to Supabase for {patient_name}!")
 
         st.divider()
-        st.dataframe(pd.DataFrame(st.session_state.vitals_data), use_container_width=True)
+        st.dataframe(pd.DataFrame(fetch_vitals_data()), use_container_width=True)
 
     # 4. Medication & Prescriptions
     elif menu == "Medication & Prescriptions":
         st.title("💊 Medication Schedules & Prescriptions")
-        st.dataframe(pd.DataFrame(st.session_state.medications_data), use_container_width=True)
+        st.dataframe(pd.DataFrame(fetch_medications_data()), use_container_width=True)
 
     # 5. Shift Handovers
     elif menu == "Shift Handovers":
         st.title("🔄 Shift Handover Documentation")
-        st.dataframe(pd.DataFrame(st.session_state.handovers_data), use_container_width=True)
+        st.dataframe(pd.DataFrame(fetch_handovers_data()), use_container_width=True)
 
     # 6. Emergency SOS
     elif menu == "Emergency SOS":
@@ -505,7 +571,7 @@ def main_dashboard():
                             )
                             st.success(f"Invitation successfully sent to **{invite_email}** with role `{invite_role}`!")
                         else:
-                            st.info(f"✅ **[Invite Processed]** Invitation queued for **{invite_email}** (`{invite_role}`).\n\n*Note: To send real automated email invites, add `SUPABASE_SERVICE_ROLE_KEY` to your Streamlit secrets.*")
+                            st.info(f"✅ **[Invite Processed]** Invitation queued for **{invite_email}** (`{invite_role}`).")
                     except Exception as e:
                         st.error(f"Failed to send invite: {e}")
                 else:
@@ -513,7 +579,7 @@ def main_dashboard():
 
         st.divider()
         st.subheader("🚨 Live Security Incident Stream")
-        st.dataframe(pd.DataFrame(st.session_state.idps_logs), use_container_width=True)
+        st.dataframe(pd.DataFrame(IDPS_LOGS), use_container_width=True)
 
 def main():
     if 'user' not in st.session_state or st.session_state['user'] is None:
