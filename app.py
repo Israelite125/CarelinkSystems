@@ -3,6 +3,9 @@ import pandas as pd
 import random
 import string
 import os
+# Absolute path to logo.png relative to app.py
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOGO_PATH = os.path.join(BASE_DIR, "logo.png")
 from datetime import datetime
 from supabase import create_client, Client
 
