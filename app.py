@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import random
 import string
+import os
 from datetime import datetime
 from supabase import create_client, Client
 
@@ -45,6 +46,7 @@ except Exception:
     SUPABASE_URL = "https://mkdvkaraqdjsxgxqjnhg.supabase.co"
     SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rZHZrYXJhcWRqc3hneHFqbmhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NDgwMzMsImV4cCI6MjEwMDEyNDAzM30.bKkl_O1FtV1iMkbFsTKF06W8hOTpRYQbt7fpFdkGGaI"
     SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rZHZrYXJhcWRqc3hneHFqbmhnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDU0ODAzMywiZXhwIjoyMTAwMTI0MDMzfQ.IZgi6bai-Rr9hveCYRoHOkwL9n3VpqPwrIPa27hW0TY"
+
 
 @st.cache_resource
 def init_supabase():
@@ -240,7 +242,13 @@ def login_signup_portal():
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("<h1 style='text-align: center; color: #a855f7;'>🩺 CareLink Portal</h1>", unsafe_allow_html=True)
+    # --- LOGO & HEADER ---
+    if os.path.exists("logo.png"):
+        col_l1, col_l2, col_l3 = st.columns([1, 1, 1])
+        with col_l2:
+            st.image("logo.png", use_container_width=True)
+
+    st.markdown("<h1 style='text-align: center; color: #a855f7; margin-top: -10px;'>CareLink Portal</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #94a3b8;'>Secure Access for Medical Staff & Patients</p>", unsafe_allow_html=True)
     
     tab1, tab2, tab3 = st.tabs(["👨‍⚕️ Clinical Staff Sign In", "🏥 Patient Registration", "🔒 Access Info"])
@@ -333,7 +341,10 @@ def patient_dashboard(user, user_metadata):
     full_name = user_metadata.get("full_name", "Patient")
     linked_patient = user_metadata.get("linked_patient", "")
 
-    st.sidebar.markdown("### 🩺 CareLink Patient Portal")
+    # Sidebar Header with Logo
+    if os.path.exists("logo.png"):
+        st.sidebar.image("logo.png", use_container_width=True)
+    st.sidebar.markdown("### CareLink Patient Portal")
     st.sidebar.markdown(f"**Patient:** `{full_name}`")
     st.sidebar.caption(f"🏥 **Linked Record:** `{linked_patient}`")
     st.sidebar.divider()
@@ -390,7 +401,10 @@ def main_dashboard():
 
     full_name = user_metadata.get("full_name", getattr(user, "email", "Staff"))
 
-    st.sidebar.markdown("### 🩺 CareLink System")
+    # Sidebar Header with Logo
+    if os.path.exists("logo.png"):
+        st.sidebar.image("logo.png", use_container_width=True)
+    st.sidebar.markdown("### CareLink System")
     st.sidebar.markdown(f"**Staff:** `{full_name}`")
     st.sidebar.caption(f"🛡️ **Role:** `{user_role.upper()}`")
     st.sidebar.divider()
